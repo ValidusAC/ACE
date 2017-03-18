@@ -290,43 +290,51 @@ namespace ACE.Entity
         }
 
         /// <summary>
+        /// gets the experience expenditure chart for a CharacterAbility.
+        /// </summary>
+        /// <remarks>
+        /// </remarks>
+        /// <returns>chart for the given CharacterAbility</returns>
+        private ExperienceExpenditureChart GetExperienceExpenditureChart(CharacterAbility ability)
+        {
+            switch (ability.Ability)
+            {
+                case Enum.Ability.Health:
+                case Enum.Ability.Stamina:
+                case Enum.Ability.Mana:
+                    return DatabaseManager.Charts.GetVitalXpChart();
+                default:
+                    return DatabaseManager.Charts.GetAbilityXpChart();
+            }
+        }
+
+        /// <summary>
         /// spends the xp on this ability.
         /// </summary>
         /// <remarks>
         ///     Known Issues:
-        ///         1. +10 skill throws an exception when it would go outside the bounds of ranks list
-        ///         2. the client doesn't increase the "next point" amount properly when using +10
-        ///         3. no fireworks for hitting max ranks
+        ///         1. the client doesn't increase the "next point" amount properly when using +10
         /// </remarks>
         /// <returns>0 if it failed, total investment of the next rank if successful</returns>
         private uint SpendAbilityXp(CharacterAbility ability, uint amount)
         {
             uint result = 0;
             bool addToCurrentValue = false;
-            ExperienceExpenditureChart chart;
-
-            switch (ability.Ability)
-            {
-                case Enum.Ability.Health:
-                case Enum.Ability.Stamina:
-                case Enum.Ability.Mana:
-                    chart = DatabaseManager.Charts.GetVitalXpChart();
-                    addToCurrentValue = true;
-                    break;
-                default:
-                    chart = DatabaseManager.Charts.GetAbilityXpChart();
-                    break;
-            }
+            ExperienceExpenditureChart chart = GetExperienceExpenditureChart(ability);
 
             uint rankUps = 0u;
             uint currentXp = chart.Ranks[Convert.ToInt32(ability.Ranks)].TotalXp;
+
+            // figure out the max number of points a skill or ability can be increased if the user clicks the +10 button
+            uint plusTenActualRankUps = Math.Min(Convert.ToUInt32(chart.Ranks.Count - ability.Ranks - 1), 10u);
+
             uint rank1 = chart.Ranks[Convert.ToInt32(ability.Ranks) + 1].XpFromPreviousRank;
-            uint rank10 = chart.Ranks[Convert.ToInt32(ability.Ranks) + 10].TotalXp - chart.Ranks[Convert.ToInt32(ability.Ranks)].TotalXp;
+            uint rank10 = chart.Ranks[Convert.ToInt32(ability.Ranks + plusTenActualRankUps)].TotalXp - chart.Ranks[Convert.ToInt32(ability.Ranks)].TotalXp;
 
             if (amount == rank1)
                 rankUps = 1u;
             else if (amount == rank10)
-                rankUps = 10u;
+                rankUps = plusTenActualRankUps;
 
             if (rankUps > 0)
             {
@@ -334,6 +342,10 @@ namespace ACE.Entity
                 ability.Ranks += rankUps;
                 ability.ExperienceSpent += amount;
                 this.character.SpendXp(amount);
+                if (ability.Ranks == chart.Ranks.Count - 1)
+                {
+                    PlayParticleEffect(0x8D);
+                }
                 result = ability.ExperienceSpent;
             }
 
@@ -341,7 +353,7 @@ namespace ACE.Entity
         }
 
         /// <summary>
-        /// Check a rank against the skill charts too determine if the skill is at max
+        /// Check a rank against the skill charts to determine if the skill is at max
         /// </summary>
         /// <returns>Returns true if skill is max rank; false if skill is below max rank</returns>
         private bool IsSkillMaxRank(uint rank, SkillStatus status)

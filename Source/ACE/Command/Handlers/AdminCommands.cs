@@ -479,7 +479,10 @@ namespace ACE.Command
             var poi = String.Join(" ", parameters);
             var teleportPOI = AssetManager.GetTeleport(poi);
             if (teleportPOI == null)
+            {
+                ChatPacket.SendServerMessage(session, $"The location of @telepoi {poi} is unknown.", ChatMessageType.Broadcast);
                 return;
+            }
 
             session.Player.Teleport(teleportPOI);
         }

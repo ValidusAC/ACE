@@ -1,4 +1,4 @@
-DELETE FROM `teleport_location` WHERE `location` IN ('VR', 'VR1', 'VR2', 'VR3', 'VR4A', 'VR4B', 'VR5', 'VR6', 'VRTree', 'VRSummercrown');
+DELETE FROM `teleport_location` WHERE `location` IN ('VR', 'VR1', 'VR2', 'VR3', 'VR4A', 'VR4B', 'VR5', 'VR6', 'VRTree', 'VRSummercrown', 'VR4BBridge');
 INSERT INTO `teleport_location` (`location`, `cell`, `x`, `y`, `z`, `qx`, `qy`, `qz`, `qw`) VALUES 
   ('VR',3007905811,66.31,64.53,55.91,0,0,-0.29,0.96),
   ('VR1',3007905844,165.48,90.63,112.01,0,0,0.38,-0.92),

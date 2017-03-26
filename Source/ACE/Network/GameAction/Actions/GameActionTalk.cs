@@ -46,6 +46,7 @@ namespace ACE.Network.GameAction.Actions
                     switch (response)
                     {
                         case CommandHandlerResponse.InvalidCommand:
+                        case CommandHandlerResponse.NotAuthorized:
                             ChatPacket.SendServerMessage(Session, $"Invalid command {command}!", ChatMessageType.Broadcast);
                             break;
                         case CommandHandlerResponse.InvalidParameterCount:

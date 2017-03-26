@@ -502,8 +502,15 @@ namespace ACE.Command
                 else
                     cell = (uint)int.Parse(parameters[0], System.Globalization.NumberStyles.HexNumber);
 
+                // Require Cell + 3 or 8 location elements
+                int positionDataElementCount = parameters.Length - 1; // exclude the cell
+                if (positionDataElementCount != 7 && positionDataElementCount != 3)
+                {
+                    throw new ArgumentException(); // wrong number of elements provided
+                }
+
                 var positionData = new float[7];
-                for (uint i = 0u; i < 7u; i++)
+                for (uint i = 0u; i < positionDataElementCount; i++)
                 {
                     float position;
                     if (!float.TryParse(parameters[i + 1].Trim(new Char[] { ' ', '[', ']' }), out position))

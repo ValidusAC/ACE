@@ -530,7 +530,10 @@ namespace ACE.Command.Handlers
             var poi = String.Join(" ", parameters);
             var teleportPOI = AssetManager.GetTeleport(poi);
             if (teleportPOI == null)
+            {
+                session.Network.EnqueueSend(new GameMessageSystemChat($"POI {poi} was not found.", ChatMessageType.Broadcast));
                 return;
+            }
 
             session.Player.Teleport(teleportPOI);
         }

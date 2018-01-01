@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using ACE.Entity;
 using System.Collections.Concurrent;
+using ACE.Entity.Enum;
 
 namespace ACE.Database
 {
@@ -71,6 +72,76 @@ namespace ACE.Database
         public List<Recipe> GetAllRecipes()
         {
             return _wrappedDatabase.GetAllRecipes();
+        }
+
+        public void CreateRecipe(Recipe recipe)
+        {
+            _wrappedDatabase.CreateRecipe(recipe);
+        }
+
+        public void UpdateRecipe(Recipe recipe)
+        {
+            _wrappedDatabase.UpdateRecipe(recipe);
+        }
+
+        public void DeleteRecipe(Guid recipeGuid)
+        {
+            _wrappedDatabase.DeleteRecipe(recipeGuid);
+        }
+
+        public List<Content> GetAllContent()
+        {
+            return _wrappedDatabase.GetAllContent();
+        }
+
+        public void CreateContent(Content content)
+        {
+            _wrappedDatabase.CreateContent(content);
+        }
+
+        public void UpdateContent(Content content)
+        {
+            _wrappedDatabase.UpdateContent(content);
+        }
+
+        public void DeleteContent(Guid contentGuid)
+        {
+            _wrappedDatabase.DeleteContent(contentGuid);
+        }
+
+        public bool SaveObject(AceObject weenie)
+        {
+            if (_weenieCache.ContainsKey(weenie.WeenieClassId))
+                _weenieCache[weenie.WeenieClassId] = weenie;
+
+            return _wrappedDatabase.SaveObject(weenie);
+        }
+        
+        public bool DeleteObject(AceObject aceObject)
+        {
+            AceObject weenie;
+            if (_weenieCache.ContainsKey(aceObject.WeenieClassId))
+                _weenieCache.TryRemove(aceObject.WeenieClassId, out weenie);
+
+            return _wrappedDatabase.DeleteObject(aceObject);
+        }
+
+        public List<WeenieSearchResult> SearchWeenies(SearchWeeniesCriteria criteria)
+        {
+            return _wrappedDatabase.SearchWeenies(criteria);
+        }
+
+        public bool UserModifiedFlagPresent()
+        {
+            return _wrappedDatabase.UserModifiedFlagPresent();
+        }
+
+        public bool ReplaceObject(AceObject aceObject)
+        {
+            if (_weenieCache.ContainsKey(aceObject.WeenieClassId))
+                _weenieCache[aceObject.WeenieClassId] = aceObject;
+
+            return _wrappedDatabase.ReplaceObject(aceObject);
         }
     }
 }

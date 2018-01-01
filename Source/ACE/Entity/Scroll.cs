@@ -76,6 +76,11 @@ namespace ACE.Entity
             ScrollPropertiesInt = PropertiesInt.Where(x => x.PropertyId == (uint)PropertyInt.Value
                                                           || x.PropertyId == (uint)PropertyInt.EncumbranceVal).ToList();
 
+            if (ScrollPropertiesString == null)
+                ScrollPropertiesString = new List<AceObjectPropertiesString>();
+            if (ScrollPropertiesSpellId == null)
+                ScrollPropertiesSpellId = new List<AceObjectPropertiesSpell>();
+
             var useString = new AceObjectPropertiesString();
             useString.AceObjectId = Guid.Full;
             useString.PropertyId = (ushort)PropertyString.Use;
@@ -168,12 +173,12 @@ namespace ACE.Entity
 
             if (success)
             {
-                readScrollChain.AddAction(session.Player, () => session.Player.HandleActionLearnSpell(SpellId));
+                readScrollChain.AddAction(session.Player, () => session.Player.LearnSpell(SpellId));
                 readScrollChain.AddAction(session.Player, () => session.Player.HandleActionMotion(motionReady));
                 var removeObjMessage = new GameMessageRemoveObject(this);
                 var destroyMessage = new GameMessageSystemChat("The scroll is destroyed.", ChatMessageType.Magic);
                 readScrollChain.AddAction(session.Player, () => session.Network.EnqueueSend(destroyMessage, removeObjMessage));
-                readScrollChain.AddAction(session.Player, () => session.Player.RemoveFromInventory(session.Player.InventoryObjects, Guid));
+                readScrollChain.AddAction(session.Player, () => session.Player.RemoveWorldObjectFromInventory(Guid));
             }
             else
             {

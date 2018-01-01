@@ -1,4 +1,4 @@
-﻿using ACE.Database;
+using ACE.Database;
 using ACE.Entity;
 using ACE.Entity.Enum;
 using ACE.Managers;
@@ -14,6 +14,7 @@ namespace ACE.Factories
 
             foreach (var aceO in sourceObjects)
             {
+                // FIXME: This generator part is all wrong. Needs overhaul.
                 if (aceO.GeneratorStatus ?? false)  // Generator
                 {
                     aceO.Location = aceO.Location.InFrontOf(-2.0);
@@ -30,6 +31,15 @@ namespace ACE.Factories
                     WorldObject wo = CreateWorldObject(aceO);
                     if (wo != null)
                         results.Add(wo);
+                    // TODO: this is a hack job. Remove this and do it right. 
+                    foreach (var item in wo.WieldList)
+                    {
+                        WorldObject wo2 = CreateNewWorldObject(item.WeenieClassId);
+                        wo2.Location = wo.Location;
+                        wo2.CurrentWieldedLocation = wo.ValidLocations;
+                        wo2.WielderId = wo.Guid.Full;
+                        results.Add(wo2);
+                    }
                 }
             }
             return results;
@@ -59,6 +69,20 @@ namespace ACE.Factories
                     return new Container(aceO);
                 case WeenieType.Scroll:
                     return new Scroll(aceO);
+                case WeenieType.Vendor:
+                    return new Vendor(aceO);
+                case WeenieType.Coin:
+                    return new Coin(aceO);
+                case WeenieType.Key:
+                    return new Key(aceO);
+                case WeenieType.Food:
+                    return new Food(aceO);
+                case WeenieType.Gem:
+                    return new Gem(aceO);
+                case WeenieType.Game:
+                    return new Game(aceO);
+                case WeenieType.GamePiece:
+                    return new GamePiece(aceO);
                 default:
                     return new GenericObject(aceO);
             }

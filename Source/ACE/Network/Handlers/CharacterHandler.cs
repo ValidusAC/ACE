@@ -32,9 +32,9 @@ namespace ACE.Network.Handlers
         {
             ObjectGuid guid = message.Payload.ReadGuid();
 
-            string account = message.Payload.ReadString16L();
+            string clientString = message.Payload.ReadString16L();
 
-            if (account != session.Account)
+            if (clientString != session.ClientAccountString)
             {
                 session.SendCharacterError(CharacterError.EnterGameCharacterNotOwned);
                 return;
@@ -59,10 +59,10 @@ namespace ACE.Network.Handlers
         [GameMessageAttribute(GameMessageOpcode.CharacterDelete, SessionState.AuthConnected)]
         public static void CharacterDelete(ClientMessage message, Session session)
         {
-            string account = message.Payload.ReadString16L();
+            string clientString = message.Payload.ReadString16L();
             uint characterSlot = message.Payload.ReadUInt32();
-
-            if (account != session.Account)
+            
+            if (clientString != session.ClientAccountString)
             {
                 session.SendCharacterError(CharacterError.Delete);
                 return;
@@ -83,10 +83,10 @@ namespace ACE.Network.Handlers
             {
                 if (deleteOrRestoreSuccess)
                 {
-                    DatabaseManager.Shard.GetCharacters(session.Id, ((List<CachedCharacter> result) =>
+                    DatabaseManager.Shard.GetCharacters(session.SubscriptionId, ((List<CachedCharacter> result) =>
                     {
                         session.UpdateCachedCharacters(result);
-                        session.Network.EnqueueSend(new GameMessageCharacterList(result, session.Account));
+                        session.Network.EnqueueSend(new GameMessageCharacterList(result, session.ClientAccountString));
                     }));
                 }
                 else
@@ -127,8 +127,8 @@ namespace ACE.Network.Handlers
         [GameMessageAttribute(GameMessageOpcode.CharacterCreate, SessionState.AuthConnected)]
         public static void CharacterCreate(ClientMessage message, Session session)
         {
-            string account = message.Payload.ReadString16L();
-            if (account != session.Account)
+            string clientString = message.Payload.ReadString16L();
+            if (clientString != session.ClientAccountString)
                 return;
 
             uint id = GuidManager.NewPlayerGuid().Full;
@@ -143,9 +143,9 @@ namespace ACE.Network.Handlers
             AceCharacter character = new AceCharacter(id);
 
             reader.Skip(4);   /* Unknown constant (1) */
-            character.Heritage = reader.ReadUInt32();
+            character.Heritage = (int)reader.ReadUInt32();
             character.HeritageGroup = cg.HeritageGroups[(int)character.Heritage].Name;
-            character.Gender = reader.ReadUInt32();
+            character.Gender = (int)reader.ReadUInt32();
             if (character.Gender == 1)
                 character.Sex = "Male";
             else
@@ -206,15 +206,14 @@ namespace ACE.Network.Handlers
                 uint headgearIconId = headCT.GetIcon(appearance.HeadgearColor);
 
                 var hat = (AceObject)DatabaseManager.World.GetAceObjectByWeenie(headgearWeenie).Clone(GuidManager.NewItemGuid().Full);
-                hat.WeenieClassId = headgearWeenie;
-                hat.Placement = 0;
-                hat.ContainerIID = id;
                 hat.PaletteOverrides = new List<PaletteOverride>(); // wipe any existing overrides
                 hat.TextureOverrides = new List<TextureMapOverride>();
                 hat.AnimationOverrides = new List<AnimationOverride>();
                 hat.SpellIdProperties = new List<AceObjectPropertiesSpell>();
-
                 hat.IconDID = headgearIconId;
+                hat.Placement = 0;
+                hat.CurrentWieldedLocation = hat.ValidLocations;
+                hat.WielderIID = id;
 
                 if (headCT.ClothingBaseEffects.ContainsKey(sex.SetupID))
                 {
@@ -257,14 +256,14 @@ namespace ACE.Network.Handlers
                             {
                                 AceObjectId = hat.AceObjectId,
                                 SubPaletteId = headgearPal,
-                                Length = (ushort)(palOffset),
-                                Offset = (ushort)(numColors)
+                                Length = (ushort)(numColors),
+                                Offset = (ushort)(palOffset)
                             });
                         }
                     }
                 }
 
-                // character.Inventory.Add(new ObjectGuid(hat.AceObjectId), hat);
+                character.WieldedItems.Add(new ObjectGuid(hat.AceObjectId), hat);
             }
 
             uint shirtWeenie = sex.GetShirtWeenie(appearance.ShirtStyle);
@@ -278,7 +277,8 @@ namespace ACE.Network.Handlers
             shirt.SpellIdProperties = new List<AceObjectPropertiesSpell>();
             shirt.IconDID = shirtIconId;
             shirt.Placement = 0;
-            shirt.ContainerIID = id;
+            shirt.CurrentWieldedLocation = shirt.ValidLocations;
+            shirt.WielderIID = id;
 
             if (shirtCT.ClothingBaseEffects.ContainsKey(sex.SetupID))
             {
@@ -333,7 +333,7 @@ namespace ACE.Network.Handlers
                 }
             }
 
-            character.Inventory.Add(new ObjectGuid(shirt.AceObjectId), shirt);
+            character.WieldedItems.Add(new ObjectGuid(shirt.AceObjectId), shirt);
 
             uint pantsWeenie = sex.GetPantsWeenie(appearance.PantsStyle);
             ClothingTable pantsCT = ClothingTable.ReadFromDat(sex.GetPantsClothingTable(appearance.PantsStyle));
@@ -346,7 +346,8 @@ namespace ACE.Network.Handlers
             pants.SpellIdProperties = new List<AceObjectPropertiesSpell>();
             pants.IconDID = pantsIconId;
             pants.Placement = 0;
-            pants.ContainerIID = id;
+            pants.CurrentWieldedLocation = pants.ValidLocations;
+            pants.WielderIID = id;
 
             // Get the character's initial pants
             if (pantsCT.ClothingBaseEffects.ContainsKey(sex.SetupID))
@@ -396,7 +397,7 @@ namespace ACE.Network.Handlers
                 }
             } // end pants
 
-            character.Inventory.Add(new ObjectGuid(pants.AceObjectId), pants);
+            character.WieldedItems.Add(new ObjectGuid(pants.AceObjectId), pants);
 
             uint footwearWeenie = sex.GetFootwearWeenie(appearance.FootwearStyle);
             ClothingTable footwearCT = ClothingTable.ReadFromDat(sex.GetFootwearClothingTable(appearance.FootwearStyle));
@@ -409,7 +410,8 @@ namespace ACE.Network.Handlers
             shoes.SpellIdProperties = new List<AceObjectPropertiesSpell>();
             shoes.IconDID = footwearIconId;
             shoes.Placement = 0;
-            shoes.ContainerIID = id;
+            shoes.CurrentWieldedLocation = shoes.ValidLocations;
+            shoes.WielderIID = id;
 
             if (footwearCT.ClothingBaseEffects.ContainsKey(sex.SetupID))
             {
@@ -458,7 +460,7 @@ namespace ACE.Network.Handlers
                 }
             } // end footwear
 
-            character.Inventory.Add(new ObjectGuid(shoes.AceObjectId), shoes);
+            character.WieldedItems.Add(new ObjectGuid(shoes.AceObjectId), shoes);
 
             // Profession (Adventurer, Bow Hunter, etc)
             // TODO - Add this title to the available titles for this character.
@@ -466,7 +468,7 @@ namespace ACE.Network.Handlers
             string templateName = cg.HeritageGroups[(int)character.Heritage].TemplateList[templateOption].Name;
             character.Title = templateName;
             character.Template = templateName;
-            character.CharacterTitleId = cg.HeritageGroups[(int)character.Heritage].TemplateList[templateOption].Title;
+            character.CharacterTitleId = (int)cg.HeritageGroups[(int)character.Heritage].TemplateList[templateOption].Title;
             character.NumCharacterTitles = 1;
 
             // stats
@@ -501,7 +503,7 @@ namespace ACE.Network.Handlers
             character.Mana.Current = character.Mana.MaxValue;
 
             // set initial skill credit amount. 52 for all but "Olthoi", which have 68
-            character.AvailableSkillCredits = cg.HeritageGroups[(int)character.Heritage].SkillCredits;
+            character.AvailableSkillCredits = (int)cg.HeritageGroups[(int)character.Heritage].SkillCredits;
 
             uint numOfSkills = reader.ReadUInt32();
             Skill skill;
@@ -592,7 +594,7 @@ namespace ACE.Network.Handlers
             character.Name = reader.ReadString16L();
             character.DisplayName = character.Name; // unsure
 
-            // currently not used
+            // Index used to determine the starting location
             uint startArea = reader.ReadUInt32();
 
             character.IsAdmin = Convert.ToBoolean(reader.ReadUInt32());
@@ -606,10 +608,10 @@ namespace ACE.Network.Handlers
                     return;
                 }
 
-                character.AccountId = session.Id;
+                character.SubscriptionId = session.SubscriptionId;
 
                 CharacterCreateSetDefaultCharacterOptions(character);
-                CharacterCreateSetDefaultCharacterPositions(character);
+                CharacterCreateSetDefaultCharacterPositions(character, startArea);
 
                 // We must await here -- 
                 DatabaseManager.Shard.SaveObject(character, ((bool saveSuccess) =>
@@ -664,9 +666,9 @@ namespace ACE.Network.Handlers
             character.SetCharacterOption(CharacterOption.ListenToLFGChat, true);
         }
 
-        public static void CharacterCreateSetDefaultCharacterPositions(AceCharacter character)
+        public static void CharacterCreateSetDefaultCharacterPositions(AceCharacter character, uint startArea)
         {
-            character.Location = CharacterPositionExtensions.StartingPosition();
+            character.Location = CharacterPositionExtensions.StartingPosition(startArea);
         }
 
         private static void SendCharacterCreateResponse(Session session, CharacterGenerationVerificationResponse response, ObjectGuid guid = default(ObjectGuid), string charName = "")

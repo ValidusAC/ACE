@@ -12,33 +12,26 @@ namespace ACE.Entity
         public Book(AceObject aceO)
             : base(aceO)
         {
-            Pages = (uint)PropertiesBook.Count; // Set correct Page Count for appraisal based on data actually in database.
+            Pages = (int)PropertiesBook.Count; // Set correct Page Count for appraisal based on data actually in database.
             MaxPages = MaxPages ?? 1; // If null, set MaxPages to 1.
         }
 
         // Called by the Landblock for books that are WorldObjects (some notes pinned to the ground, statues, pedestals and tips in training academy, etc
-        public override void HandleActionOnUse(ObjectGuid playerId)
+        public override void ActOnUse(ObjectGuid playerId)
         {
-            ActionChain chain = new ActionChain();
-            CurrentLandblock.ChainOnObject(chain, playerId, (WorldObject wo) =>
+            Player player = CurrentLandblock.GetObject(playerId) as Player;
+            if (player == null)
             {
-                Player player = wo as Player;
-                if (player == null)
-                {
-                    return;
-                }
+                return;
+            }
 
-                // Make sure player is within the use radius of the item.
-                if (!player.IsWithinUseRadiusOf(this))
-                    player.DoMoveTo(this);
-                else
-                {
-                    BookUseHandler(player.Session);
-                }
-            });
-
-            // Run on the player
-            chain.EnqueueChain();
+            // Make sure player is within the use radius of the item.
+            if (!player.IsWithinUseRadiusOf(this))
+                player.DoMoveTo(this);
+            else
+            {
+                BookUseHandler(player.Session);
+            }
         }
 
         // Called when the items is in a player's inventory
@@ -52,8 +45,8 @@ namespace ACE.Entity
         /// <param name="session"></param>
         private void BookUseHandler(Session session)
         {
-            uint maxChars = MaxCharactersPerPage ?? 1000;
-            uint maxPages = MaxPages ?? 1;
+            int maxChars = MaxCharactersPerPage ?? 1000;
+            int maxPages = MaxPages ?? 1;
 
             string authorName;
             if (ScribeName != null)

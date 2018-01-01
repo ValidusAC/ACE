@@ -1,23 +1,16 @@
-﻿using System;
-using System.Collections.ObjectModel;
+using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Forms;
-using ACE.Entity.Events;
 using ACE.Managers;
 using log4net;
 using ACE.Database;
-using ACE.Network.GameEvent.Events;
 using ACE.Network.GameMessages;
 using ACE.Network.Sequence;
-using ACE.Network.GameAction;
 using ACE.Network.GameMessages.Messages;
 using ACE.Network.Motion;
-using ACE.Network.Enum;
-using ACE.Entity.Enum.Properties;
 using ACE.Factories;
 using ACE.Entity.Enum;
 using ACE.DatLoader.FileTypes;
@@ -102,7 +95,7 @@ namespace ACE.Entity
             // TODO: Load spawn data
 
             var objects = DatabaseManager.World.GetWeenieInstancesByLandblock(this.id.Landblock); // Instances
-            // FIXME: Likely the next line should be eliminated after generators have been refactored into the instance structure, if that ends up making the most sense 
+            // FIXME: Likely the next line should be eliminated after generators have been refactored into the instance structure, if that ends up making the most sense
             //        I don't know for sure however that it does yet. More research on them is required -Ripley
             objects.AddRange(DatabaseManager.World.GetObjectsByLandblock(this.id.Landblock)); // Generators
 
@@ -195,7 +188,8 @@ namespace ACE.Entity
 
         public void AddWorldObject(WorldObject wo)
         {
-            EnqueueAction(new ActionEventDelegate(() => AddWorldObjectInternal(wo)));
+            // EnqueueAction(new ActionEventDelegate(() => AddWorldObjectInternal(wo)));
+            AddWorldObjectInternal(wo);
         }
 
         public ActionChain GetAddWorldObjectChain(WorldObject wo, Player noBroadcast = null)
@@ -296,11 +290,6 @@ namespace ACE.Entity
         /// <summary>
         /// Check to see if we are close enough to interact.   Adds a fudge factor of 1.5f
         /// </summary>
-        /// <param name="playerGuid"></param>
-        /// <param name="targetGuid"></param>
-        /// <param name="arrivedRadiusSquared"></param>
-        /// <param name="arrivedRadiusSquared"></param>
-        /// <returns></returns>
         public bool WithinUseRadius(ObjectGuid playerGuid, ObjectGuid targetGuid, out float arrivedRadiusSquared, out bool validGuids)
         {
             var playerPosition = GetWorldObjectPosition(playerGuid);
@@ -343,7 +332,8 @@ namespace ACE.Entity
         }
 
         /// <summary>
-        /// main game loop
+        /// Every game-loop iteration work.  Ideally this wouldn't exist, but we haven't finished
+        /// fully transitioning landblocks to an event-based system.
         /// </summary>
         public void UseTime(double tickTime)
         {
@@ -372,7 +362,9 @@ namespace ACE.Entity
         private void UpdateStatus(LandBlockStatusFlag flag)
         {
             Status.LandBlockStatusFlag = flag;
-            Diagnostics.Diagnostics.SetLandBlockKey(id.LandblockX, id.LandblockY, Status);
+            // TODO: Diagnostics uses WinForms, which is not supported in .net standard/core.
+            // TODO: We need a better way to expose diagnostic information moving forward.
+            // Diagnostics.Diagnostics.SetLandBlockKey(id.LandblockX, id.LandblockY, Status);
         }
 
         private void UpdateStatus(int pcount)
@@ -381,7 +373,9 @@ namespace ACE.Entity
             if (pcount > 0)
             {
                 Status.LandBlockStatusFlag = LandBlockStatusFlag.InUseLow;
-                Diagnostics.Diagnostics.SetLandBlockKey(id.LandblockX, id.LandblockY, Status);
+                // TODO: Diagnostics uses WinForms, which is not supported in .net standard/core.
+                // TODO: We need a better way to expose diagnostic information moving forward.
+                // Diagnostics.Diagnostics.SetLandBlockKey(id.LandblockX, id.LandblockY, Status);
             }
             else
             {
@@ -393,9 +387,6 @@ namespace ACE.Entity
         /// <summary>
         /// Gets all landblocks in range of a position.  (for indoors positions that is just this landblock)
         /// </summary>
-        /// <param name="pos"></param>
-        /// <param name="distance"></param>
-        /// <returns></returns>
         private List<Landblock> GetLandblocksInRange(Position pos, float distance)
         {
             List<Landblock> inRange = new List<Landblock>();
@@ -550,6 +541,24 @@ namespace ACE.Entity
                 new GameMessageSound(wo.Guid,
                     sound,
                     volume));
+        }
+        
+        /// <summary>
+        /// Convenience wrapper to EnqueueBroadcast to broadcast local chat.
+        /// </summary>
+        /// <param name="wo"></param>
+        /// <param name="message"></param>
+        public void EnqueueBroadcastSystemChat(WorldObject wo, string message, ChatMessageType type)
+        {
+            // wo must exist on us
+            if (wo.CurrentLandblock != this)
+            {
+                log.Error("ERROR: Broadcasting chat from object not on our landblock");
+            }
+
+            GameMessageSystemChat chatMsg = new GameMessageSystemChat(message, type);
+
+            EnqueueBroadcast(wo.Location, MaxObjectRange, chatMsg);
         }
 
         /// <summary>
@@ -708,9 +717,6 @@ namespace ACE.Entity
         /// <summary>
         /// Should only be called by the physics engine / WorldManager!
         /// </summary>
-        /// <param name="wo"></param>
-        /// <param name="distance"></param>
-        /// <returns></returns>
         public List<WorldObject> GetWorldObjectsInRangeForPhysics(WorldObject wo, float distance)
         {
             return GetWorldObjectsInRange(wo, distance);
@@ -734,7 +740,7 @@ namespace ACE.Entity
             return null;
         }
 
-        private WorldObject GetObject(ObjectGuid guid)
+        public WorldObject GetObject(ObjectGuid guid)
         {
             Landblock lb = GetOwner(guid);
             if (lb == null)
@@ -764,6 +770,12 @@ namespace ACE.Entity
             return lb.worldObjects[guid].Location;
         }
 
+        public WeenieType GetWeenieType(ObjectGuid guid)
+        {
+            return worldObjects.ContainsKey(guid) ? worldObjects[guid].WeenieType : 0;
+        }
+
+        /*
         public void ChainOnObject(ActionChain chain, ObjectGuid woGuid, Action<WorldObject> action)
         {
             WorldObject wo = GetObject(woGuid);
@@ -774,6 +786,7 @@ namespace ACE.Entity
 
             chain.AddAction(wo, () => action(wo));
         }
+        */
 
         /// <summary>
         /// Intended for when moving an item directly to a player's container (which is not visible to the landblock)
@@ -798,7 +811,7 @@ namespace ACE.Entity
             }
         }
 
-        public void QueueItemTransfer(ActionChain chain, ObjectGuid wo, ObjectGuid container, uint placement = 0)
+        public void QueueItemTransfer(ActionChain chain, ObjectGuid wo, ObjectGuid container, int placement = 0)
         {
             // Find owner of wo
             Landblock lb = GetOwner(wo);
@@ -814,7 +827,7 @@ namespace ACE.Entity
             }
         }
 
-        private void ItemTransferContainerInternal(ObjectGuid woGuid, Container container, uint placement = 0)
+        private void ItemTransferContainerInternal(ObjectGuid woGuid, Container container, int placement = 0)
         {
             WorldObject wo = GetObject(woGuid);
 
@@ -825,13 +838,14 @@ namespace ACE.Entity
 
             RemoveWorldObjectInternal(woGuid, false);
             wo.ContainerId = container.Guid.Full;
+
             // We are coming off the world we need to be ready to save.
             wo.Location = null;
             wo.InitializeAceObjectForSave();
             container.AddToInventory(wo, placement);
         }
 
-        private void ItemTransferInternal(ObjectGuid woGuid, ObjectGuid containerGuid, uint placement = 0)
+        private void ItemTransferInternal(ObjectGuid woGuid, ObjectGuid containerGuid, int placement = 0)
         {
             Container container = GetObject(containerGuid) as Container;
 

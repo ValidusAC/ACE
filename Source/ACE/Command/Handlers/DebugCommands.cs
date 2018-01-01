@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using ACE.Entity;
 using ACE.Entity.Enum;
 using ACE.Entity.Actions;
@@ -7,12 +7,11 @@ using ACE.Network;
 using ACE.Network.GameMessages.Messages;
 using ACE.Network.GameEvent.Events;
 using ACE.Factories;
-using System.Globalization;
 using ACE.Network.Motion;
 using ACE.DatLoader.FileTypes;
 using System.Linq;
 using System.Collections.Generic;
-using ACE.Database;
+using ACE.DatLoader.Entity;
 using ACE.Entity.Enum.Properties;
 
 namespace ACE.Command.Handlers
@@ -173,7 +172,7 @@ namespace ACE.Command.Handlers
         public static void HandleDebugGPS(Session session, params string[] parameters)
         {
             var position = session.Player.Location;
-            ChatPacket.SendServerMessage(session, $"Position: [Cell: 0x{position.LandblockId.Landblock.ToString("X4")} | Offset: {position.PositionX}, {position.PositionY}, {position.PositionZ} | Facing: {position.RotationX}, {position.RotationY}, {position.RotationZ}, {position.RotationW}]", ChatMessageType.Broadcast);
+            ChatPacket.SendServerMessage(session, $"Position: [Cell: 0x{position.LandblockId.Landblock:X4} | Offset: {position.PositionX}, {position.PositionY}, {position.PositionZ} | Facing: {position.RotationX}, {position.RotationY}, {position.RotationZ}, {position.RotationW}]", ChatMessageType.Broadcast);
         }
 
         // telexyz cell x y z qx qy qz qw
@@ -205,13 +204,13 @@ namespace ACE.Command.Handlers
             "Recalls the last portal used.")]
         public static void HandleDebugPortalRecall(Session session, params string[] parameters)
         {
-            session.Player.HandleActionTeleToPosition(PositionType.LastPortal, () =>
+            if (!session.Player.TeleToPosition(PositionType.LastPortal))
             // On error
             {
                 // You are too powerful to interact with that portal!
                 var portalRecallMessage = new GameEventDisplayStatusMessage(session, StatusMessageType1.Enum_04A3);
                 session.Network.EnqueueSend(portalRecallMessage);
-            });
+            }
         }
 
         // grantxp ulong
@@ -234,6 +233,31 @@ namespace ACE.Command.Handlers
             }
             ChatPacket.SendServerMessage(session, "Usage: /grantxp 1234 (max 999999999999)", ChatMessageType.Broadcast);
             return;
+        }
+
+        [CommandHandler("contract", AccessLevel.Developer, CommandHandlerFlag.RequiresWorld, 1,
+            "Send a contract to yourself.", "uint\n" + "@sendcontract 100 is a sample contract")]
+        public static void HandleContract(Session session, params string[] parameters)
+        {
+            if (!(parameters?.Length > 0)) return;
+            uint contractId;
+            if (!uint.TryParse(parameters[0], out contractId)) return;
+
+            ContractTracker contractTracker = new ContractTracker(contractId, session.Player.Guid.Full)
+            {
+                Stage = 0,
+                TimeWhenDone = 0,
+                TimeWhenRepeats = 0,
+                DeleteContract = 0,
+                SetAsDisplayContract = 1
+            };
+
+            if (!session.Player.TrackedContracts.ContainsKey(contractId))
+                session.Player.TrackedContracts.Add(contractId, contractTracker);
+
+            GameEventSendClientContractTracker contractMsg = new GameEventSendClientContractTracker(session, contractTracker);
+            session.Network.EnqueueSend(contractMsg);
+            ChatPacket.SendServerMessage(session, "You just added " + contractTracker.ContractDetails.ContractName, ChatMessageType.Broadcast);
         }
 
         // grantxp ulong
@@ -326,7 +350,7 @@ namespace ACE.Command.Handlers
                     if (Enum.IsDefined(typeof(PlayScript), effect))
                     {
                         message = $"Playing effect {Enum.GetName(typeof(PlayScript), effect)}";
-                        session.Player.HandleActionApplyVisualEffect(effect);
+                        session.Player.ApplyVisualEffects(effect);
                     }
                 }
 
@@ -401,16 +425,9 @@ namespace ACE.Command.Handlers
             if ((parameters?.Length > 0))
                 distance = Convert.ToInt16(parameters[0]);
             WorldObject loot = WorldObjectFactory.CreateNewWorldObject(trainingWandTarget);
+            LootGenerationFactory.Spawn(loot, session.Player.Location.InFrontOf(distance));
 
-            ActionChain chain = new Entity.Actions.ActionChain();
-
-            // By chaining the spawn followed by the add pickup action, we ensure the item will be spawned before the player
-            chain.AddChain(LootGenerationFactory.GetSpawnChain(loot, session.Player.Location.InFrontOf(distance)));
-
-            chain.AddAction(session.Player,
-                () => session.Player.HandleActionPutItemInContainer(loot.Guid, session.Player.Guid));
-
-            chain.EnqueueChain();
+            session.Player.PutItemInContainer(loot.Guid, session.Player.Guid);
         }
 
         // This function
@@ -672,23 +689,14 @@ namespace ACE.Command.Handlers
 
                 if (Enum.TryParse(parsePositionString, out positionType))
                 {
-                    bool success = true;
-                    ActionChain teleChain = session.Player.GetTeleToPositionChain(positionType, () =>
+                    if (session.Player.TeleToPosition(positionType))
                     {
-                        success = false;
-                    });
-                    teleChain.AddAction(session.Player, () =>
+                        session.Network.EnqueueSend(new GameMessageSystemChat($"{PositionType.Location} {session.Player.Location.ToString()}", ChatMessageType.Broadcast));
+                    }
+                    else
                     {
-                        if (success)
-                        {
-                            session.Network.EnqueueSend(new GameMessageSystemChat($"{PositionType.Location} {session.Player.Location.ToString()}", ChatMessageType.Broadcast));
-                        }
-                        else
-                        {
-                            session.Network.EnqueueSend(new GameMessageSystemChat($"Error finding saved character position: {positionType}", ChatMessageType.Broadcast));
-                        }
-                    });
-                    teleChain.EnqueueChain();
+                        session.Network.EnqueueSend(new GameMessageSystemChat($"Error finding saved character position: {positionType}", ChatMessageType.Broadcast));
+                    }
                 }
             }
         }
@@ -724,7 +732,7 @@ namespace ACE.Command.Handlers
         {
             if (!(parameters?.Length > 0))
             {
-                ChatPacket.SendServerMessage(session, "Usage: @equiptest (hex)clothingTableId [palette_index].\neg '@equiptest 0x100005fd'",
+                ChatPacket.SendServerMessage(session, "Usage: @equiptest (hex)clothingTableId [palette_index] [shade].\neg '@equiptest 0x100005fd'",
                     ChatMessageType.Broadcast);
                 return;
             }
@@ -743,9 +751,16 @@ namespace ACE.Command.Handlers
                 int palOption = -1;
                 if (parameters.Length > 1)
                     palOption = Int32.Parse(parameters[1]);
+                float shade = 0;
+                if (parameters.Length > 2)
+                    shade = Single.Parse(parameters[2]);
+                if (shade < 0)
+                    shade = 0;
+                if (shade > 1)
+                    shade = 1;
 
                 if ((modelId >= 0x10000001) && (modelId <= 0x1000086B))
-                    session.Player.TestWieldItem(session, modelId, palOption);
+                    session.Player.TestWieldItem(session, modelId, palOption, shade);
                 else
                     ChatPacket.SendServerMessage(session, "Please enter a value greater than 0x10000000 and less than 0x1000086C",
                         ChatMessageType.Broadcast);
@@ -769,7 +784,7 @@ namespace ACE.Command.Handlers
             string message = "";
             foreach (Session playerSession in WorldManager.GetAll(false))
             {
-                message += $"{playerSession.Player.Name} : {(uint)playerSession.Id}\n";
+                message += $"{playerSession.Player.Name} : {(uint)playerSession.SubscriptionId}\n";
                 playerCounter++;
             }
             message += $"Total connected Players: {playerCounter}\n";
@@ -787,37 +802,31 @@ namespace ACE.Command.Handlers
             "Creates testing items in your inventory.")]
         public static void HandleWeapons(Session session, params string[] parameters)
         {
-            // HashSet<uint> weaponsTest = new HashSet<uint>() { 93, 127, 130, 136, 136, 136, 148, 300, 307, 311, 326, 338, 348, 350, 7765, 12748, 12463, 31812 };
+            HashSet<uint> weaponsTest = new HashSet<uint>() { 93, 127, 130, 136, 136, 136, 148, 300, 307, 311, 326, 338, 348, 350, 7765, 12748, 12463, 31812 };
 
-            HashSet<uint> weaponsTest = new HashSet<uint>() { (uint)TestWeenieClassIds.Pants,
-                                                              (uint)TestWeenieClassIds.Tunic,
-                                                              (uint)TestWeenieClassIds.TrainingWand,
-                                                              (uint)TestWeenieClassIds.ColoBackpack };
-            ActionChain chain = new ActionChain();
-
-            chain.AddAction(session.Player, () =>
+            ////HashSet<uint> weaponsTest = new HashSet<uint>() { (uint)TestWeenieClassIds.Pants,
+            ////                                                  (uint)TestWeenieClassIds.Tunic,
+            ////                                                  (uint)TestWeenieClassIds.TrainingWand,
+            ////                                                  (uint)TestWeenieClassIds.ColoBackpack };
+            foreach (uint weenieId in weaponsTest)
             {
-                foreach (uint weenieId in weaponsTest)
-                {
-                    WorldObject loot = WorldObjectFactory.CreateNewWorldObject(weenieId);
-                    loot.ContainerId = session.Player.Guid.Full;
-                    loot.Placement = 0;
-                    // TODO: Og II
-                    // Need this hack because weenies are not cleaned up.   Can be removed once weenies are fixed.
-                    loot.WielderId = null;
-                    loot.CurrentWieldedLocation = null;
+                WorldObject loot = WorldObjectFactory.CreateNewWorldObject(weenieId);
+                loot.ContainerId = session.Player.Guid.Full;
+                loot.Placement = 0;
+                // TODO: Og II
+                // Need this hack because weenies are not cleaned up.   Can be removed once weenies are fixed.
+                loot.WielderId = null;
+                loot.CurrentWieldedLocation = null;
 
-                    session.Player.AddToInventory(loot);
-                    session.Player.TrackObject(loot);
-                    session.Player.UpdatePlayerBurden();
-                    session.Network.EnqueueSend(
-                        new GameMessagePutObjectInContainer(session, session.Player.Guid, loot, 0),
-                        new GameMessageUpdateInstanceId(loot.Guid, session.Player.Guid, PropertyInstanceId.Container));
-                }
-                // Force a save for our test items.   Og II
-                // DatabaseManager.Shard.SaveObject(session.Player.GetSavableCharacter(), null);
-            });
-            chain.EnqueueChain();
+                session.Player.AddToInventory(loot);
+                session.Player.TrackObject(loot);
+                ////session.Player.UpdatePlayerBurden();
+                session.Network.EnqueueSend(
+                    new GameMessagePutObjectInContainer(session, session.Player.Guid, loot, 0),
+                    new GameMessageUpdateInstanceId(loot.Guid, session.Player.Guid, PropertyInstanceId.Container));
+            }
+            // Force a save for our test items.   Og II
+            // DatabaseManager.Shard.SaveObject(session.Player.GetSavableCharacter(), null);
         }
 
         // This debug command was added to test combat stance - we need one of each type weapon and a shield Og II
@@ -826,25 +835,25 @@ namespace ACE.Command.Handlers
         public static void HandleInv(Session session, params string[] parameters)
         {
             HashSet<uint> weaponsTest = new HashSet<uint>() { 44, 45, 46, 15268, 15269, 15270, 15271, 12748, 5893, 136 };
-            ActionChain chain = new ActionChain();
 
-            chain.AddAction(session.Player, () =>
+            foreach (uint weenieId in weaponsTest)
             {
-                foreach (uint weenieId in weaponsTest)
+                WorldObject loot = WorldObjectFactory.CreateNewWorldObject(weenieId);
+                loot.ContainerId = session.Player.Guid.Full;
+                loot.Placement = 0;
+                session.Player.AddToInventory(loot);
+                session.Player.TrackObject(loot);
+                ActionChain chain = new ActionChain();
+                chain.AddDelaySeconds(0.25);
+                ////session.Player.UpdatePlayerBurden();
+                chain.AddAction(session.Player, () =>
                 {
-                    WorldObject loot = WorldObjectFactory.CreateNewWorldObject(weenieId);
-                    loot.ContainerId = session.Player.Guid.Full;
-                    loot.Placement = 0;
-                    session.Player.AddToInventory(loot);
-                    session.Player.TrackObject(loot);
-                    chain.AddDelaySeconds(0.25);
-                    session.Player.UpdatePlayerBurden();
                     session.Network.EnqueueSend(
                         new GameMessagePutObjectInContainer(session, session.Player.Guid, loot, 0),
                         new GameMessageUpdateInstanceId(loot.Guid, session.Player.Guid, PropertyInstanceId.Container));
-                }
-            });
-            chain.EnqueueChain();
+                });
+                chain.EnqueueChain();
+            }
         }
 
         [CommandHandler("splits", AccessLevel.Developer, CommandHandlerFlag.RequiresWorld, 0,
@@ -852,26 +861,39 @@ namespace ACE.Command.Handlers
         public static void HandleSplits(Session session, params string[] parameters)
         {
             HashSet<uint> splitsTest = new HashSet<uint>() { 237, 300, 690, 20630, 20631, 37155, 31198 };
-            ActionChain chain = new ActionChain();
 
-            chain.AddAction(session.Player, () =>
+            foreach (uint weenieId in splitsTest)
             {
-                foreach (uint weenieId in splitsTest)
-                {
-                    WorldObject loot = WorldObjectFactory.CreateNewWorldObject(weenieId);
-                    var valueEach = loot.Value / loot.StackSize;
-                    loot.StackSize = loot.MaxStackSize;
-                    loot.Value = loot.StackSize * valueEach;
-                    loot.ContainerId = session.Player.Guid.Full;
-                    loot.Placement = 0;
-                    session.Player.AddToInventory(loot);
-                    session.Player.TrackObject(loot);
-                    session.Network.EnqueueSend(
-                        new GameMessagePutObjectInContainer(session, session.Player.Guid, loot, 0),
-                        new GameMessageUpdateInstanceId(loot.Guid, session.Player.Guid, PropertyInstanceId.Container));
-                }
-            });
-            chain.EnqueueChain();
+                WorldObject loot = WorldObjectFactory.CreateNewWorldObject(weenieId);
+                var valueEach = loot.Value / loot.StackSize;
+                loot.StackSize = loot.MaxStackSize;
+                loot.Value = loot.StackSize * valueEach;
+                loot.ContainerId = session.Player.Guid.Full;
+                loot.Placement = 0;
+                session.Player.AddToInventory(loot);
+                session.Player.TrackObject(loot);
+                session.Network.EnqueueSend(
+                    new GameMessagePutObjectInContainer(session, session.Player.Guid, loot, 0),
+                    new GameMessageUpdateInstanceId(loot.Guid, session.Player.Guid, PropertyInstanceId.Container));
+            }
+        }
+
+        [CommandHandler("setcoin", AccessLevel.Developer, CommandHandlerFlag.RequiresWorld, 1,
+        "Set Coin display debug only usage")]
+        public static void HandleSetCoin(Session session, params string[] parameters)
+        {
+            int coins;
+            try
+            {
+                coins = Convert.ToInt32(parameters[0]);
+            }
+            catch (Exception)
+            {
+                ChatPacket.SendServerMessage(session, "Not a valid number - must be a number between 0 - 2,147,483,647", ChatMessageType.Broadcast);
+                return;
+            }
+            session.Player.CoinValue = coins;
+            session.Network.EnqueueSend(new GameMessagePrivateUpdatePropertyInt(session.Player.Sequences, PropertyInt.CoinValue, coins));
         }
 
         [CommandHandler("cirand", AccessLevel.Developer, CommandHandlerFlag.RequiresWorld, 1,
@@ -901,9 +923,7 @@ namespace ACE.Command.Handlers
                     return;
                 }
             }
-            ActionChain chain = new ActionChain();
-            chain.AddAction(session.Player, () => LootGenerationFactory.CreateRandomTestWorldObjects(session.Player, typeId, numItems));
-            chain.EnqueueChain();
+            LootGenerationFactory.CreateRandomTestWorldObjects(session.Player, typeId, numItems);
         }
 
         /// <summary>
@@ -912,9 +932,7 @@ namespace ACE.Command.Handlers
         [CommandHandler("barbershop", AccessLevel.Developer, CommandHandlerFlag.RequiresWorld)]
         public static void BarberShop(Session session, params string[] parameters)
         {
-            ActionChain chain = new ActionChain();
-            chain.AddAction(session.Player, () => session.Network.EnqueueSend(new GameEventStartBarber(session)));
-            chain.EnqueueChain();
+            session.Network.EnqueueSend(new GameEventStartBarber(session));
         }
 
         // addspell <spell>
@@ -955,6 +973,17 @@ namespace ACE.Command.Handlers
                 Console.WriteLine("Comp " + i.ToString() + ": " + comps.SpellComponents[formula[i]].Name);
             }
             Console.WriteLine();
+        }
+
+        /// <summary>
+        /// Debug command to set player vitals to 1
+        /// </summary>
+        [CommandHandler("harmself", AccessLevel.Developer, CommandHandlerFlag.RequiresWorld)]
+        public static void HarmSelf(Session session, params string[] parameters)
+        {
+            session.Player.UpdateVital(session.Player.Health, 1);
+            session.Player.UpdateVital(session.Player.Stamina, 1);
+            session.Player.UpdateVital(session.Player.Mana, 1);
         }
     }
 }

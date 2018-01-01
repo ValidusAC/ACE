@@ -1,4 +1,5 @@
-﻿using ACE.Entity;
+﻿using ACE.DatLoader.FileTypes;
+using ACE.Entity;
 using ACE.Entity.Actions;
 using ACE.Entity.Enum;
 using ACE.Entity.Enum.Properties;
@@ -72,7 +73,9 @@ namespace ACE.Managers
 
             UniversalMotion motion = new UniversalMotion(MotionStance.Standing, new MotionItem(MotionCommand.ClapHands));
             craftChain.AddAction(player, () => player.HandleActionMotion(motion));
-            craftChain.AddDelaySeconds(0.5);
+            float craftAnimationLength = MotionTable.GetAnimationLength((uint)player.MotionTableId, MotionCommand.ClapHands);
+            craftChain.AddDelaySeconds(craftAnimationLength);
+            // craftChain.AddDelaySeconds(0.5);
 
             craftChain.AddAction(player, () =>
             {
@@ -169,7 +172,7 @@ namespace ACE.Managers
             // skill will be null since the difficulty is calculated manually
             if (recipe.SkillId == null)
             {
-                log.Warn($"healing recipe has null skill id (should almost certainly be healing, but who knows).  recipe id {recipe.RecipeId}.");
+                log.Warn($"healing recipe has null skill id (should almost certainly be healing, but who knows).  recipe id {recipe.RecipeGuid}.");
                 player.SendUseDoneEvent();
                 return;
             }
@@ -237,7 +240,7 @@ namespace ACE.Managers
                 if (player.CombatMode != CombatMode.NonCombat && player.CombatMode != CombatMode.Undef)
                     difficulty *= 1.1;
                 
-                uint boost = source.Boost ?? 0;
+                int boost = source.Boost ?? 0;
                 double multiplier = source.HealkitMod ?? 1;
 
                 double playerSkill = skill.ActiveValue + boost;

@@ -1,4 +1,4 @@
-﻿using ACE.Entity.Enum;
+using ACE.Entity.Enum;
 using ACE.Entity.Enum.Properties;
 using ACE.Network.Enum;
 using ACE.Network.Motion;
@@ -62,12 +62,6 @@ namespace ACE.Entity
             set { AceObject.CorpseGeneratedRare = value; }
         }
 
-        public bool SuppressGenerateEffect
-        {
-            get { return AceObject.SuppressGenerateEffect ?? false; }
-            set { AceObject.SuppressGenerateEffect = value; }
-        }
-
         public bool ChestRegenOnClose
         {
             get { return AceObject.ChestRegenOnClose ?? false; }
@@ -80,31 +74,31 @@ namespace ACE.Entity
             set { AceObject.ChestClearedWhenClosed = value; }
         }
 
-        public uint GeneratorTimeType
+        public int GeneratorTimeType
         {
             get { return AceObject.GeneratorTimeType ?? 0; }
             set { AceObject.GeneratorTimeType = value; }
         }
 
-        public uint GeneratorProbability
+        public int GeneratorProbability
         {
             get { return AceObject.GeneratorProbability ?? 0; }
             set { AceObject.GeneratorProbability = value; }
         }
 
-        public uint MaxGeneratedObjects
+        public int MaxGeneratedObjects
         {
             get { return AceObject.MaxGeneratedObjects ?? 0; }
             set { AceObject.MaxGeneratedObjects = value; }
         }
 
-        public uint GeneratorType
+        public int GeneratorType
         {
             get { return AceObject.GeneratorType ?? 0; }
             set { AceObject.GeneratorType = value; }
         }
 
-        public uint ActivationCreateClass
+        public int ActivationCreateClass
         {
             get { return AceObject.ActivationCreateClass ?? 0; }
             set { AceObject.ActivationCreateClass = value; }

@@ -1,4 +1,4 @@
-﻿using ACE.Entity.Enum;
+using ACE.Entity.Enum;
 using ACE.Entity.Actions;
 using ACE.Factories;
 using ACE.Managers;
@@ -12,7 +12,6 @@ using ACE.Network.GameMessages.Messages;
 using ACE.Network.Sequence;
 using System.Collections.Generic;
 using System.Linq;
-using ACE.DatLoader.Entity;
 using System.IO;
 
 namespace ACE.Entity
@@ -120,17 +119,18 @@ namespace ACE.Entity
             }
         }
 
-        public virtual ActionChain GetOnKillChain(Session killerSession)
+        public virtual void DoOnKill(Session killerSession)
         {
-            ActionChain onKillChain = new ActionChain();
-            /*
-            // Wait to respawn
-            onKillChain.AddDelayTicks(10);
-            */
+            OnKillInternal(killerSession).EnqueueChain();
+        }
 
+        protected ActionChain OnKillInternal(Session killerSession)
+        {
             // Will start death animation
-            onKillChain.AddAction(this, () => OnKill(killerSession));
-            // Wait for kill animation
+            OnKill(killerSession);
+
+            // Wait, then run kill animation
+            ActionChain onKillChain = new ActionChain();
             onKillChain.AddDelaySeconds(2);
             onKillChain.AddChain(GetCreateCorpseChain());
 
@@ -146,25 +146,25 @@ namespace ACE.Entity
         {
             ActionChain createCorpseChain = new ActionChain(this, () =>
             {
-                // Create Corspe and set a location on the ground
-                // TODO: set text of killer in description and find a better computation for the location, some corpse could end up in the ground
-                var corpse = CorpseObjectFactory.CreateCorpse(this, this.Location);
-                // FIXME(ddevec): We don't have a real corpse yet, so these come in null -- this hack just stops them from crashing the game
-                corpse.Location.PositionY -= (corpse.ObjScale ?? 0);
-                corpse.Location.PositionZ -= (corpse.ObjScale ?? 0) / 2;
+                ////// Create Corspe and set a location on the ground
+                ////// TODO: set text of killer in description and find a better computation for the location, some corpse could end up in the ground
+                ////var corpse = CorpseObjectFactory.CreateCorpse(this, this.Location);
+                ////// FIXME(ddevec): We don't have a real corpse yet, so these come in null -- this hack just stops them from crashing the game
+                ////corpse.Location.PositionY -= (corpse.ObjScale ?? 0);
+                ////corpse.Location.PositionZ -= (corpse.ObjScale ?? 0) / 2;
 
-                // Corpses stay on the ground for 5 * player level but minimum 1 hour
-                // corpse.DespawnTime = Math.Max((int)session.Player.PropertiesInt[Enum.Properties.PropertyInt.Level] * 5, 360) + WorldManager.PortalYearTicks; // as in live
-                // corpse.DespawnTime = 20 + WorldManager.PortalYearTicks; // only for testing
-                float despawnTime = GetCorpseSpawnTime();
+                ////// Corpses stay on the ground for 5 * player level but minimum 1 hour
+                ////// corpse.DespawnTime = Math.Max((int)session.Player.PropertiesInt[Enum.Properties.PropertyInt.Level] * 5, 360) + WorldManager.PortalYearTicks; // as in live
+                ////// corpse.DespawnTime = 20 + WorldManager.PortalYearTicks; // only for testing
+                ////float despawnTime = GetCorpseSpawnTime();
 
-                // Create corpse
-                CurrentLandblock.AddWorldObject(corpse);
-                // Create corpse decay
-                ActionChain despawnChain = new ActionChain();
-                despawnChain.AddDelaySeconds(despawnTime);
-                despawnChain.AddAction(CurrentLandblock, () => corpse.CurrentLandblock.RemoveWorldObject(corpse.Guid, false));
-                despawnChain.EnqueueChain();
+                ////// Create corpse
+                ////CurrentLandblock.AddWorldObject(corpse);
+                ////// Create corpse decay
+                ////ActionChain despawnChain = new ActionChain();
+                ////despawnChain.AddDelaySeconds(despawnTime);
+                ////despawnChain.AddAction(CurrentLandblock, () => corpse.CurrentLandblock.RemoveWorldObject(corpse.Guid, false));
+                ////despawnChain.EnqueueChain();
             });
             return createCorpseChain;
         }
@@ -198,9 +198,6 @@ namespace ACE.Entity
         /// <summary>
         /// Updates a vital, returns true if vital is now < max
         /// </summary>
-        /// <param name="vital"></param>
-        /// <param name="quantity"></param>
-        /// <returns></returns>
         public void UpdateVital(CreatureVital vital, uint newVal)
         {
             EnqueueAction(new ActionEventDelegate(() => UpdateVitalInternal(vital, newVal)));
@@ -269,9 +266,9 @@ namespace ACE.Entity
             if (mEquipedWand != null)
             {
                 UniversalMotion mm = new UniversalMotion(MotionStance.Spellcasting);
-                mm.MovementData.CurrentStyle = (ushort)MotionStance.Spellcasting;
+                mm.MovementData.CurrentStyle = (uint)MotionStance.Spellcasting;
                 SetMotionState(this, mm);
-                CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessagePrivateUpdatePropertyInt(Sequences, PropertyInt.CombatMode, (uint)CombatMode.Magic));
+                CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessagePrivateUpdatePropertyInt(Sequences, PropertyInt.CombatMode, (int)CombatMode.Magic));
             }
             else
                 log.InfoFormat("Changing combat mode for {0} - could not locate a wielded magic caster", Guid);
@@ -302,6 +299,21 @@ namespace ACE.Entity
         }
 
         /// <summary>
+        /// GetWilded Items
+        /// </summary>
+        public virtual WorldObject GetWieldedItem(ObjectGuid objectGuid)
+        {
+            // check wielded objects
+            WorldObject inventoryItem;
+            if (WieldedObjects.ContainsKey(objectGuid))
+            {
+                if (WieldedObjects.TryGetValue(objectGuid, out inventoryItem))
+                    return inventoryItem;
+            }
+            return null;
+        }
+
+        /// <summary>
         /// This method sets us into peace mode.   It checks our current state to see if we have missle ammo equipped
         /// it will make the call to hid the "ammo" as we switch to peace mode.   It will then send the message switch our stance. Og II
         /// </summary>
@@ -316,16 +328,17 @@ namespace ACE.Entity
             // End hack
             CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessageUpdatePosition(this));
             UniversalMotion mm = new UniversalMotion(MotionStance.Standing);
-            mm.MovementData.CurrentStyle = (ushort)MotionStance.Standing;
+            mm.MovementData.CurrentStyle = (uint)MotionStance.Standing;
             SetMotionState(this, mm);
-            var mEquipedAmmo = WieldedObjects.First(s => s.Value.CurrentWieldedLocation == EquipMask.MissileAmmo).Value;
-            CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessagePrivateUpdatePropertyInt(Sequences, PropertyInt.CombatMode, (uint)CombatMode.NonCombat));
+            var mEquipedAmmo = WieldedObjects.FirstOrDefault(s => s.Value.CurrentWieldedLocation == EquipMask.MissileAmmo).Value;
+            CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessagePrivateUpdatePropertyInt(Sequences, PropertyInt.CombatMode, (int)CombatMode.NonCombat));
             if (mEquipedAmmo != null)
                 CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectGhostRange, new GameMessagePickupEvent(mEquipedAmmo));
         }
 
         public void HandleSwitchToMissileCombatMode(ActionChain combatModeChain)
         {
+            // TODO and FIXME: GetInventoryItem doesn't work for this so this function is effectively broke
             HeldItem mEquipedMissile = Children.Find(s => s.EquipMask == EquipMask.MissileWeapon);
             if (mEquipedMissile?.Guid != null)
             {
@@ -339,13 +352,27 @@ namespace ACE.Entity
                 var mEquipedAmmo = WieldedObjects.First(s => s.Value.CurrentWieldedLocation == EquipMask.MissileAmmo).Value;
 
                 MotionStance ms;
+                CombatStyle cs;
 
                 if (missileWeapon.DefaultCombatStyle != null)
-                    ms = (MotionStance)missileWeapon.DefaultCombatStyle;
+                    cs = missileWeapon.DefaultCombatStyle.Value;
                 else
                 {
                     log.InfoFormat("Changing combat mode for {0} - wielded item {1} has not be assigned a default combat style", Guid, mEquipedMissile.Guid);
                     return;
+                }
+
+                switch (cs)
+                {
+                    case CombatStyle.Bow:
+                        ms = MotionStance.BowAttack;
+                        break;
+                    case CombatStyle.Crossbow:
+                        ms = MotionStance.CrossBowAttack;
+                        break;
+                    default:
+                        ms = MotionStance.Invalid;
+                        break;
                 }
 
                 UniversalMotion mm = new UniversalMotion(ms);
@@ -359,7 +386,7 @@ namespace ACE.Entity
                 {
                     CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessageUpdatePosition(this));
                     SetMotionState(this, mm);
-                    mm.MovementData.ForwardCommand = (ushort)MotionCommand.Reload;
+                    mm.MovementData.ForwardCommand = (uint)MotionCommand.Reload;
                     SetMotionState(this, mm);
                     CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessageUpdatePosition(this));
                     // FIXME: (Og II)<this is a hack for now to be removed. Need to pull delay from dat file
@@ -372,12 +399,13 @@ namespace ACE.Entity
                     combatModeChain.AddAction(this, () => CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessageParentEvent(this, mEquipedAmmo, 1, 1)));
                     // CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessageParentEvent(this, ammo, 1, 1)); // used for debugging
                 }
-                CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessagePrivateUpdatePropertyInt(Sequences, PropertyInt.CombatMode, (uint)CombatMode.Missile));
+                CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessagePrivateUpdatePropertyInt(Sequences, PropertyInt.CombatMode, (int)CombatMode.Missile));
             }
         }
 
         public void HandleSwitchToMeleeCombatMode(CombatMode olCombatMode)
         {
+            // TODO and FIXME: GetInventoryItem doesn't work for this so this function is effectively broke
             bool shieldEquiped = false;
             bool weaponInShieldSlot = false;
 
@@ -400,6 +428,7 @@ namespace ACE.Entity
             HeldItem mEquipedMelee = Children.Find(s => s.EquipMask == EquipMask.MeleeWeapon);
             HeldItem mEquipedTwoHanded = Children.Find(s => s.EquipMask == EquipMask.TwoHanded);
             MotionStance ms = MotionStance.Invalid;
+            CombatStyle cs = CombatStyle.Undef;
             // are we unarmed?   If so, do we have a shield?
             if (mEquipedMelee == null && mEquipedTwoHanded == null && !weaponInShieldSlot)
             {
@@ -415,7 +444,20 @@ namespace ACE.Entity
             {
                 WorldObject twoHandedWeapon = GetInventoryItem(new ObjectGuid(mEquipedTwoHanded.Guid));
                 if (twoHandedWeapon.DefaultCombatStyle != null)
-                    ms = twoHandedWeapon.DefaultCombatStyle.Value;
+                {
+                    cs = twoHandedWeapon.DefaultCombatStyle.Value;
+                    // ms = MotionStance.TwoHandedSwordAttack;
+                    // ms = MotionStance.TwoHandedStaffAttack; ?
+                    switch (cs)
+                    {
+                        // case CombatStyle.???
+                        // ms = MotionStance.TwoHandedStaffAttack;
+                        // break;
+                        default:
+                            ms = MotionStance.TwoHandedSwordAttack;
+                            break;
+                    }
+                }
             }
 
             // Let's see if we are melee single handed / two handed with our without shield as appropriate.
@@ -432,21 +474,43 @@ namespace ACE.Entity
                 if (!shieldEquiped)
                 {
                     if (meleeWeapon.DefaultCombatStyle != null)
-                        ms = meleeWeapon.DefaultCombatStyle.Value;
+                    {
+                        cs = meleeWeapon.DefaultCombatStyle.Value;
+                        switch (cs)
+                        {
+                            case CombatStyle.Atlatl:
+                                ms = MotionStance.AtlatlCombat;
+                                break;
+                            case CombatStyle.Sling:
+                                ms = MotionStance.SlingAttack;
+                                break;
+                            case CombatStyle.ThrownWeapon:
+                                ms = MotionStance.ThrownWeaponAttack;
+                                break;
+                            default:
+                                ms = MotionStance.MeleeNoShieldAttack;
+                                break;
+                        }
+                    }
                 }
                 else
                 {
                     switch (meleeWeapon.DefaultCombatStyle)
                     {
-                        case MotionStance.MeleeNoShieldAttack:
+                        case CombatStyle.Unarmed:
+                        case CombatStyle.OneHanded:
+                        case CombatStyle.OneHandedAndShield:
+                        case CombatStyle.TwoHanded:
+                        case CombatStyle.DualWield:
+                        case CombatStyle.Melee:
                             ms = MotionStance.MeleeShieldAttack;
                             break;
-                        case MotionStance.ThrownWeaponAttack:
+                        case CombatStyle.ThrownWeapon:
                             ms = MotionStance.ThrownShieldCombat;
                             break;
-                        case MotionStance.UaNoShieldAttack:
-                            ms = MotionStance.MeleeShieldAttack;
-                            break;
+                        ////case CombatStyle.Unarmed:
+                        ////    ms = MotionStance.MeleeShieldAttack;
+                        ////    break;
                         default:
                             log.InfoFormat(
                                 "Changing combat mode for {0} - unable to determine correct combat stance for weapon {1}", Guid, mEquipedMelee.Guid);
@@ -459,7 +523,7 @@ namespace ACE.Entity
                 UniversalMotion mm = new UniversalMotion(ms);
                 mm.MovementData.CurrentStyle = (ushort)ms;
                 SetMotionState(this, mm);
-                CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessagePrivateUpdatePropertyInt(Sequences, PropertyInt.CombatMode, (uint)CombatMode.Melee));
+                CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessagePrivateUpdatePropertyInt(Sequences, PropertyInt.CombatMode, (int)CombatMode.Melee));
             }
             else
                 log.InfoFormat("Changing combat mode for {0} - wielded item {1} has not be assigned a default combat style", Guid, mEquipedMelee?.Guid ?? mEquipedTwoHanded?.Guid);
@@ -587,5 +651,64 @@ namespace ACE.Entity
 
             WorldManager.BroadcastToAll(sysMessage);
         }
+
+        /// <summary>
+        /// This signature services MoveToObject and TurnToObject
+        /// Update Position prior to start, start them moving or turning, set statemachine to moving.
+        /// Moved from player - we need to be able to move creatures as well.   Og II
+        /// </summary>
+        /// <param name="worldObjectPosition">Position in the world</param>
+        /// <param name="sequence">Sequence for the object getting the message.</param>
+        /// <param name="movementType">What type of movement are we about to execute</param>
+        /// <param name="targetGuid">Who are we moving or turning toward</param>
+        /// <returns>MovementStates</returns>
+        public void OnAutonomousMove(Position worldObjectPosition, SequenceManager sequence, MovementTypes movementType, ObjectGuid targetGuid)
+        {
+            UniversalMotion newMotion = new UniversalMotion(MotionStance.Standing, worldObjectPosition, targetGuid);
+            newMotion.DistanceFrom = 0.60f;
+            newMotion.MovementTypes = movementType;
+            CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessageUpdatePosition(this));
+            CurrentLandblock.EnqueueBroadcastMotion(this, newMotion);
+        }
+
+        /// <summary>
+        /// This is the OnUse method.   This is just an initial implemention.   I have put in the turn to action at this point.
+        /// If we are out of use radius, move to the object.   Once in range, let's turn the creature toward us and get started.
+        /// Note - we may need to make an NPC class vs monster as using a monster does not make them turn towrad you as I recall. Og II
+        ///  Also, once we are reading in the emotes table by weenie - this will automatically customize the behavior for creatures.
+        /// </summary>
+        /// <param name="playerId">Identity of the player we are interacting with</param>
+        public override void ActOnUse(ObjectGuid playerId)
+        {
+            Player player = CurrentLandblock.GetObject(playerId) as Player;
+            if (player == null)
+            {
+                return;
+            }
+
+            if (!player.IsWithinUseRadiusOf(this))
+            {
+                player.DoMoveTo(this);
+            }
+            else
+            {
+                OnAutonomousMove(player.Location, this.Sequences, MovementTypes.TurnToObject, playerId);
+
+                GameEventUseDone sendUseDoneEvent = new GameEventUseDone(player.Session);
+                player.Session.Network.EnqueueSend(sendUseDoneEvent);
+            }
+        }       
+
+        public void EnterWorld()
+        {
+            if (Location != null)
+            {
+                LandblockManager.AddObject(this);
+                if (SuppressGenerateEffect != true)
+                    ApplyVisualEffects(Enum.PlayScript.Create);
+            }
+        }
+
+        protected static readonly UniversalMotion MotionDeath = new UniversalMotion(MotionStance.Standing, new MotionItem(MotionCommand.Dead));
     }
 }

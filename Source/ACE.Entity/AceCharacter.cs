@@ -28,15 +28,15 @@ namespace ACE.Entity
             WeenieHeaderFlags = 0;
             SetIntProperty(PropertyInt.ItemsCapacity, 102);
             SetIntProperty(PropertyInt.ContainersCapacity, 7);           
-            SetIntProperty(PropertyInt.ItemUseable, (uint)Usable.No);
+            SetIntProperty(PropertyInt.ItemUseable, (int)Usable.No);
             SetIntProperty(PropertyInt.ShowableOnRadar, (byte)RadarBehavior.ShowAlways);
 
             PhysicsState = 0;
 
             WeenieClassId = 1;
-            SetIntProperty(PropertyInt.WeenieType, (uint)Enum.WeenieType.Creature); // This might need to change
+            SetIntProperty(PropertyInt.WeenieType, (int)Enum.WeenieType.Creature); // This might need to change
             SetDataIdProperty(PropertyDataId.Icon, 100667446);
-            SetIntProperty(PropertyInt.ItemType, (uint)Enum.ItemType.Creature);
+            SetIntProperty(PropertyInt.ItemType, (int)Enum.ItemType.Creature);
             // SetIntProperty(PropertyInt.RadarBlipColor, (byte)RadarColor.White);
             SetBoolProperty(PropertyBool.IsDeleted, false);
             SetIntProperty(PropertyInt.TotalLogins, 0);
@@ -50,12 +50,12 @@ namespace ACE.Entity
             SetBoolProperty(PropertyBool.FirstEnterWorldDone, false);
 
             SetDoubleTimestamp(PropertyDouble.CreationTimestamp);
-            SetIntProperty(PropertyInt.CreationTimestamp, (uint)GetDoubleProperty(PropertyDouble.CreationTimestamp));
+            SetIntProperty(PropertyInt.CreationTimestamp, (int)GetDoubleProperty(PropertyDouble.CreationTimestamp));
             SetStringProperty(PropertyString.DateOfBirth, $"{System.DateTime.UtcNow.ToString("dd MMMM yyyy")}");
 
-            SetIntProperty(PropertyInt.CreatureType, (uint)Enum.CreatureType.Human);
-            SetIntProperty(PropertyInt.ChannelsAllowed, (uint)Channel.AllChans);
-            SetIntProperty(PropertyInt.ChannelsActive, (uint)Channel.AllBroadcast);
+            SetIntProperty(PropertyInt.CreatureType, (int)Enum.CreatureType.Human);
+            SetIntProperty(PropertyInt.ChannelsAllowed, (int)Channel.AllChans);
+            SetIntProperty(PropertyInt.ChannelsActive, (int)Channel.AllBroadcast);
 
             SetIntProperty(PropertyInt.NumDeaths, 0);
 
@@ -74,12 +74,12 @@ namespace ACE.Entity
             SetIntProperty(PropertyInt.LifeResistRating, 0);
             SetIntProperty(PropertyInt.WeaponAuraDamage, 0);
             SetIntProperty(PropertyInt.WeaponAuraSpeed, 0);
-            SetIntProperty(PropertyInt.Unknown381, 0);
-            SetIntProperty(PropertyInt.Unknown382, 0);
-            SetIntProperty(PropertyInt.Unknown386, 0);
-            SetIntProperty(PropertyInt.Unknown387, 0);
-            SetIntProperty(PropertyInt.Unknown388, 0);
-            SetIntProperty(PropertyInt.Unknown389, 0);
+            SetIntProperty(PropertyInt.PKDamageRating, 0);
+            SetIntProperty(PropertyInt.PKDamageResistRating, 0);
+            SetIntProperty(PropertyInt.Overpower, 0);
+            SetIntProperty(PropertyInt.OverpowerResist, 0);
+            SetIntProperty(PropertyInt.GearOverpower, 0);
+            SetIntProperty(PropertyInt.GearOverpowerResist, 0);
             SetDoubleProperty(PropertyDouble.WeaponAuraOffense, 0);
             SetDoubleProperty(PropertyDouble.WeaponAuraDefense, 0);
             SetDoubleProperty(PropertyDouble.WeaponAuraElemental, 0);
@@ -97,7 +97,7 @@ namespace ACE.Entity
             SetIntProperty(PropertyInt.LumAugSkilledCraft, 0);
             SetIntProperty(PropertyInt.LumAugSkilledSpec, 0);
             SetIntProperty(PropertyInt.LumAugAllSkills, 0);
-            SetIntProperty(PropertyInt.Unknown390, 0);
+            SetIntProperty(PropertyInt.Enlightenment, 0);
             SetIntProperty(PropertyInt.GearDamage, 0);
             SetIntProperty(PropertyInt.GearDamageResist, 0);
             SetIntProperty(PropertyInt.GearCrit, 0);
@@ -108,43 +108,36 @@ namespace ACE.Entity
             SetIntProperty(PropertyInt.GearNetherResist, 0);
             SetIntProperty(PropertyInt.GearLifeResist, 0);
             SetIntProperty(PropertyInt.GearMaxHealth, 0);
-            SetIntProperty(PropertyInt.Unknown383, 0);
-            SetIntProperty(PropertyInt.Unknown384, 0);
-            SetIntProperty(PropertyInt.Unknown389, 0);
+            SetIntProperty(PropertyInt.GearPKDamageRating, 0);
+            SetIntProperty(PropertyInt.GearPKDamageResistRating, 0);
 
             SetBoolProperty(PropertyBool.Account15Days, true);
 
-            SetIntProperty(PropertyInt.PlayerKillerStatus, (uint)PlayerKillerStatus.NPK);
+            SetIntProperty(PropertyInt.PlayerKillerStatus, (int)PlayerKillerStatus.NPK);
         }
 
         public ReadOnlyCollection<Friend> Friends { get; set; }
 
         public uint CharacterSlot { get; set; }
 
-        public uint CharacterOptions1Mapping
+        public int CharacterOptions1Mapping
         {
             get { return GetIntProperty(PropertyInt.CharacterOptions1) ?? 0; }
             set { SetIntProperty(PropertyInt.CharacterOptions1, value); }
         }
 
-        public uint CharacterOptions2Mapping
+        public int CharacterOptions2Mapping
         {
             get { return GetIntProperty(PropertyInt.CharacterOptions2) ?? 0; }
             set { SetIntProperty(PropertyInt.CharacterOptions2, value); }
         }
 
-        public new uint TotalLogins
+        public new int TotalLogins
         {
             get { return GetIntProperty(PropertyInt.TotalLogins) ?? 0; }
             set { SetIntProperty(PropertyInt.TotalLogins, value); }
         }
-
-        public uint AccountId
-        {
-            get { return (uint)GetInstanceIdProperty(PropertyInstanceId.Account); }
-            set { SetInstanceIdProperty(PropertyInstanceId.Account, value); }
-        }
-
+        
         public bool Deleted
         {
             get { return GetBoolProperty(PropertyBool.IsDeleted) ?? false; }
@@ -166,11 +159,11 @@ namespace ACE.Entity
         {
             if (value)
             {
-                CharacterOptions1Mapping |= (uint)option;
+                CharacterOptions1Mapping |= (int)option;
             }
             else
             {
-                CharacterOptions1Mapping &= ~(uint)option;
+                CharacterOptions1Mapping &= ~(int)option;
             }
 
             dirtyOptions = true;
@@ -185,11 +178,11 @@ namespace ACE.Entity
         {
             if (value)
             {
-                CharacterOptions2Mapping |= (uint)option;
+                CharacterOptions2Mapping |= (int)option;
             }
             else
             {
-                CharacterOptions2Mapping &= ~(uint)option;
+                CharacterOptions2Mapping &= ~(int)option;
             }
 
             dirtyOptions = true;
@@ -207,7 +200,7 @@ namespace ACE.Entity
             set { SetInt64Property(PropertyInt64.TotalExperience, value); }
         }
 
-        public new uint Age
+        public new int Age
         {
             get { return GetIntProperty(PropertyInt.Age) ?? 0; }
             set { SetIntProperty(PropertyInt.Age, value); }
@@ -219,31 +212,31 @@ namespace ACE.Entity
             set { SetBoolProperty(PropertyBool.IsDeleted, value); }
         }
 
-        public new uint AvailableSkillCredits
+        public new int AvailableSkillCredits
         {
             get { return GetIntProperty(PropertyInt.AvailableSkillCredits) ?? 0; }
             set { SetIntProperty(PropertyInt.AvailableSkillCredits, value); }
         }
 
-        public new uint TotalSkillCredits
+        public new int TotalSkillCredits
         {
             get { return GetIntProperty(PropertyInt.TotalSkillCredits) ?? 0; }
             set { SetIntProperty(PropertyInt.TotalSkillCredits, value); }
         }
 
-        public new uint NumDeaths
+        public new int NumDeaths
         {
             get { return GetIntProperty(PropertyInt.NumDeaths) ?? 0; }
             set { SetIntProperty(PropertyInt.NumDeaths, value); }
         }
 
-        public new uint DeathLevel
+        public new int DeathLevel
         {
             get { return GetIntProperty(PropertyInt.DeathLevel) ?? 0; }
             set { SetIntProperty(PropertyInt.DeathLevel, value); }
         }
 
-        public new uint VitaeCpPool
+        public new int VitaeCpPool
         {
             get { return GetIntProperty(PropertyInt.VitaeCpPool) ?? 0; }
             set { SetIntProperty(PropertyInt.VitaeCpPool, value); }
@@ -381,7 +374,7 @@ namespace ACE.Entity
             set { SetDataIdProperty(PropertyDataId.CombatTable, value); }
         }
 
-        public new uint Level
+        public new int Level
         {
             get { return GetIntProperty(PropertyInt.Level) ?? 1; }
             set { SetIntProperty(PropertyInt.Level, value); }
@@ -442,7 +435,7 @@ namespace ACE.Entity
         /// Sets the skill to trained status for a character
         /// </summary>
         /// <param name="skill"></param>
-        public bool TrainSkill(Skill skill, uint creditsSpent)
+        public bool TrainSkill(Skill skill, int creditsSpent)
         {
             CreatureSkill cs = GetSkillProperty(skill);
             if (cs != null && cs.Status != SkillStatus.Trained && cs.Status != SkillStatus.Specialized)
@@ -463,7 +456,7 @@ namespace ACE.Entity
         /// Sets the skill to specialized status for a character
         /// </summary>
         /// <param name="skill"></param>
-        public bool SpecializeSkill(Skill skill, uint creditsSpent)
+        public bool SpecializeSkill(Skill skill, int creditsSpent)
         {
             CreatureSkill cs = GetSkillProperty(skill);
             if (cs != null && cs.Status == SkillStatus.Trained)
@@ -485,7 +478,7 @@ namespace ACE.Entity
         /// Sets the skill to untrained status for a character
         /// </summary>
         /// <param name="skill"></param>
-        public bool UntrainSkill(Skill skill, uint creditsSpent)
+        public bool UntrainSkill(Skill skill, int creditsSpent)
         {
             CreatureSkill cs = GetSkillProperty(skill);
             if (cs != null && cs.Status != SkillStatus.Trained && cs.Status != SkillStatus.Specialized) 

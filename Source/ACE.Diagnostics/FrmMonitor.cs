@@ -2,6 +2,7 @@
 using ACE.Entity.Enum;
 using System;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -9,6 +10,9 @@ using System.Windows.Forms;
 
 namespace ACE.Diagnostics
 {
+    [SuppressMessage("Microsoft.StyleCop.CSharp.Naming", "SA1300:ElementMustBeginWithUpperCaseLetter", Justification = "form designer code")]
+    [SuppressMessage("Microsoft.StyleCop.CSharp.Naming", "SA1306:FieldNamesMustBeginWithLowerCaseLetter", Justification = "form designer code")]
+    [SuppressMessage("StyleCop.CSharp.NamingRules", "*", Justification = "Reviewed. Suppression is OK here.")]
     public partial class FrmMonitor : Form
     {
         public FrmMonitor()
@@ -41,7 +45,6 @@ namespace ACE.Diagnostics
 
         private void FrmMonitor_Load(object sender, EventArgs e)
         {
-
             backColor = Color.Black;
             picZoom.SizeMode = PictureBoxSizeMode.Zoom;
 
@@ -82,7 +85,7 @@ namespace ACE.Diagnostics
 
                 for (int row = 0; row < 255; row++)
                 {
-                 for    (int col = 0; col < 255; col++)
+                 for (int col = 0; col < 255; col++)
                     {
                         if (!Diagnostics.LandBlockDiag)
                             return;
@@ -145,7 +148,6 @@ namespace ACE.Diagnostics
                 gra.DrawImage(bitmapdiag, 0, 0);
 
                 picImage.Image = canvas;
-
             }
             // on first draw this is true.
             if (initdraw)
@@ -241,12 +243,10 @@ namespace ACE.Diagnostics
             // Refresh the picZoom picturebox to reflect the changes
 
             picZoom.Refresh();
-
         }
 
         private void picImage_MouseMove(object sender, MouseEventArgs e)
         {
-
             // The AC landblocks are laid out in a grid of 0,0 by 254,254 but not as you would expect
             // 0,254  ******** 254,254
             //        ********
@@ -286,6 +286,5 @@ namespace ACE.Diagnostics
                 txtDetail.Text += Environment.NewLine + string.Format("Players:  {0} ", status.PlayerCount);
             }
         }
-
     }
 }

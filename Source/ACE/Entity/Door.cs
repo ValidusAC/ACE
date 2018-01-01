@@ -1,18 +1,28 @@
-﻿using ACE.Entity.Enum;
-using ACE.Entity.Actions;
-using ACE.Network.Enum;
-using ACE.Network.GameEvent.Events;
-using ACE.Network.Motion;
+﻿using System.Collections.Generic;
 using ACE.Entity.Enum.Properties;
-using System;
-using ACE.DatLoader.FileTypes;
+using ACE.Entity.Enum;
+using ACE.Entity.Actions;
+using ACE.Network.GameEvent.Events;
 using ACE.Network.GameMessages.Messages;
+using ACE.Network.Motion;
 using ACE.Common;
 
 namespace ACE.Entity
 {
     public class Door : WorldObject
     {
+        private static List<AceObjectPropertyId> _updateLocked = new List<AceObjectPropertyId>() { new AceObjectPropertyId((uint)PropertyBool.Locked, AceObjectPropertyType.PropertyBool) };
+
+        public enum UnlockDoorResults : ushort
+        {
+            UnlockSuccess   = 0,
+            PickLockFailed  = 1,
+            IncorrectKey    = 2,
+            AlreadyUnlocked = 3,
+            CannotBePicked  = 4,
+            DoorOpen        = 5
+        }
+
         private static readonly MovementData movementOpen = new MovementData();
         private static readonly MovementData movementClosed = new MovementData();
 
@@ -46,6 +56,7 @@ namespace ACE.Entity
             IsLocked = AceObject.Locked ?? false;
             ResetInterval = AceObject.ResetInterval ?? 30.0f;
             ResistLockpick = AceObject.ResistLockpick ?? 0;
+            LockCode = AceObject.LockCode ?? "";
 
             // If we had the base weenies this would be the way to go
             ////if (DefaultLocked)
@@ -57,8 +68,8 @@ namespace ACE.Entity
             if (IsLocked)
                 DefaultLocked = true;
 
-            movementOpen.ForwardCommand = (ushort)MotionCommand.On;
-            movementClosed.ForwardCommand = (ushort)MotionCommand.Off;
+            movementOpen.ForwardCommand = (uint)MotionCommand.On;
+            movementClosed.ForwardCommand = (uint)MotionCommand.Off;
 
             if (UseRadius < 2)
                 UseRadius = 2;
@@ -72,8 +83,8 @@ namespace ACE.Entity
 
         private bool IsLocked
         {
-            get;
-            set;
+            get { return AceObject.Locked ?? false; }
+            set { AceObject.Locked = value; }
         }
 
         private bool DefaultLocked
@@ -145,74 +156,69 @@ namespace ACE.Entity
             set;
         }
 
-        private uint? ResistLockpick
+        private int? ResistLockpick
         {
             get;
             set;
         }
 
-        private uint? AppraisalLockpickSuccessPercent
+        private int? AppraisalLockpickSuccessPercent
         {
             get;
             set;
         }
 
-        public override void HandleActionOnUse(ObjectGuid playerId)
+        public override void ActOnUse(ObjectGuid playerId)
         {
-            ActionChain chain = new ActionChain();
-            CurrentLandblock.ChainOnObject(chain, playerId, (WorldObject wo) =>
+            Player player = CurrentLandblock.GetObject(playerId) as Player;
+            if (player == null)
             {
-                Player player = wo as Player;
-                if (player == null)
+                return;
+            }
+
+            ////if (playerDistanceTo >= 2500)
+            ////{
+            ////    var sendTooFarMsg = new GameEventDisplayStatusMessage(player.Session, StatusMessageType1.Enum_0037);
+            ////    player.Session.Network.EnqueueSend(sendTooFarMsg, sendUseDoneEvent);
+            ////    return;
+            ////}
+
+            if (!player.IsWithinUseRadiusOf(this))
+                player.DoMoveTo(this);
+            else
+            {
+                ActionChain checkDoorChain = new ActionChain();
+
+                checkDoorChain.AddAction(this, () =>
                 {
-                    return;
-                }
-
-                ////if (playerDistanceTo >= 2500)
-                ////{
-                ////    var sendTooFarMsg = new GameEventDisplayStatusMessage(player.Session, StatusMessageType1.Enum_0037);
-                ////    player.Session.Network.EnqueueSend(sendTooFarMsg, sendUseDoneEvent);
-                ////    return;
-                ////}
-
-                if (!player.IsWithinUseRadiusOf(this))
-                    player.DoMoveTo(this);
-                else
-                {
-                    ActionChain checkDoorChain = new ActionChain();
-
-                    checkDoorChain.AddAction(this, () =>
+                    if (!IsLocked)
                     {
-                        if (!IsLocked)
+                        if (!IsOpen)
                         {
-                            if (!IsOpen)
-                            {
-                                Open(playerId);
-                            }
-                            else
-                            {
-                                Close(playerId);
-                            }
-
-                            // Create Door auto close timer
-                            ActionChain autoCloseTimer = new ActionChain();
-                            autoCloseTimer.AddDelaySeconds(ResetInterval);
-                            autoCloseTimer.AddAction(this, () => Reset());
-                            autoCloseTimer.EnqueueChain();
+                            Open(playerId);
                         }
                         else
                         {
-                            CurrentLandblock.EnqueueBroadcastSound(this, Sound.OpenFailDueToLock);
+                            Close(playerId);
                         }
 
-                        var sendUseDoneEvent = new GameEventUseDone(player.Session);
-                        player.Session.Network.EnqueueSend(sendUseDoneEvent);
-                    });
+                            // Create Door auto close timer
+                            ActionChain autoCloseTimer = new ActionChain();
+                        autoCloseTimer.AddDelaySeconds(ResetInterval);
+                        autoCloseTimer.AddAction(this, () => Reset());
+                        autoCloseTimer.EnqueueChain();
+                    }
+                    else
+                    {
+                        CurrentLandblock.EnqueueBroadcastSound(this, Sound.OpenFailDueToLock);
+                    }
 
-                    checkDoorChain.EnqueueChain();
-                }
-            });
-            chain.EnqueueChain();
+                    var sendUseDoneEvent = new GameEventUseDone(player.Session);
+                    player.Session.Network.EnqueueSend(sendUseDoneEvent);
+                });
+
+                checkDoorChain.EnqueueChain();
+            }
         }
 
         private void Open(ObjectGuid opener = new ObjectGuid())
@@ -224,6 +230,8 @@ namespace ACE.Entity
             CurrentMotionState = motionStateOpen;
             Ethereal = true;
             IsOpen = true;
+            CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessagePublicUpdatePropertyBool(this.Sequences, PropertyBool.Ethereal, Ethereal));
+            CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessagePublicUpdatePropertyBool(this.Sequences, PropertyBool.Open, IsOpen));
             if (opener.Full > 0)
                 UseTimestamp++;
         }
@@ -237,6 +245,8 @@ namespace ACE.Entity
             CurrentMotionState = motionStateClosed;
             Ethereal = false;
             IsOpen = false;
+            CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessagePublicUpdatePropertyBool(this.Sequences, PropertyBool.Ethereal, Ethereal));
+            CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessagePublicUpdatePropertyBool(this.Sequences, PropertyBool.Open, IsOpen));
             if (closer.Full > 0)
                 UseTimestamp++;
         }
@@ -247,11 +257,64 @@ namespace ACE.Entity
                 return;
 
             if (!DefaultOpen)
+            {
                 Close(ObjectGuid.Invalid);
+                if (DefaultLocked)
+                {
+                    IsLocked = true;
+                    CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessagePublicUpdatePropertyBool(this.Sequences, PropertyBool.Locked, IsLocked));
+                    // CurrentLandblock.EnqueueBroadcastSound(this, Sound.LockSuccess); // TODO: need to find the lock sound
+                }
+            }
             else
                 Open(ObjectGuid.Invalid);
 
             ResetTimestamp++;
+        }
+
+        /// <summary>
+        /// Used for unlocking a door via lockpick, so contains a skill check
+        /// player.Skills[Skill.Lockpick].ActiveValue should be sent for the skill check
+        /// </summary>
+        public UnlockDoorResults UnlockDoor(uint playerLockpickSkillLvl)
+        {
+            if (ResistLockpick == 0)
+                return UnlockDoorResults.CannotBePicked;
+
+            if (playerLockpickSkillLvl >= ResistLockpick)
+            {
+                if (!IsLocked)
+                    return UnlockDoorResults.AlreadyUnlocked;
+
+                IsLocked = false;
+                CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessagePublicUpdatePropertyBool(this.Sequences, PropertyBool.Locked, IsLocked));
+                CurrentLandblock.EnqueueBroadcastSound(this, Sound.LockSuccess);
+                return UnlockDoorResults.UnlockSuccess;
+            }
+            else
+                return UnlockDoorResults.PickLockFailed;
+        }
+
+        /// <summary>
+        /// Used for unlocking a door via a key
+        /// </summary>
+        public UnlockDoorResults UnlockDoor(string keyCode)
+        {
+            if (IsOpen)
+                return UnlockDoorResults.DoorOpen;
+
+            if (keyCode == LockCode)
+            {
+                if (!IsLocked)
+                    return UnlockDoorResults.AlreadyUnlocked;
+
+                IsLocked = false;
+                CurrentLandblock.EnqueueBroadcast(Location, Landblock.MaxObjectRange, new GameMessagePublicUpdatePropertyBool(this.Sequences, PropertyBool.Locked, IsLocked));
+                CurrentLandblock.EnqueueBroadcastSound(this, Sound.LockSuccess);
+                return UnlockDoorResults.UnlockSuccess;
+            }
+            else
+                return UnlockDoorResults.IncorrectKey;
         }
     }
 }

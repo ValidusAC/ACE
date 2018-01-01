@@ -1,8 +1,16 @@
-﻿namespace ACE.Entity.Enum.Properties
+﻿using System.ComponentModel;
+
+namespace ACE.Entity.Enum.Properties
 {
-    public enum PropertyInstanceId : uint
+    public enum PropertyInstanceId : ushort
     {
-        Undef                            = 0,
+        // properties marked as ServerOnly are properties we never saw in PCAPs, from here:
+        // http://ac.yotesfan.com/ace_object/not_used_enums.php
+        // source: @OptimShi
+
+        // description attributes are used by the weenie editor for a cleaner display name
+
+        Undef = 0,
         Owner                            = 1,
         Container                        = 2,
         Wielder                          = 3,
@@ -50,7 +58,16 @@
         PetDevice                        = 45,
 
         // values over 9000 are ones that we have added and should not be sent to the client
-        Account                          = 9001,
+        Subscription                     = 9001,
         Friend                           = 9002
+    }
+
+    public static class PropertyInstanceIdExtensions
+    {
+        public static string GetDescription(this PropertyInstanceId prop)
+        {
+            var description = EnumHelper.GetAttributeOfType<DescriptionAttribute>(prop);
+            return description?.Description ?? prop.ToString();
+        }
     }
 }

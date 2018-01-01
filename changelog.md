@@ -1,5 +1,311 @@
 # ACEmulator Change Log
 
+### 2017-12-11
+[ddevec]
+* More updates to parallelism structure
+* Network messages are now seralized
+* Removed the vast majority of ActionChain code that was being used for parallelism/thread safety
+
+### 2017-12-10
+[Mag-nus]
+* ACE has been converted from .net framework 4.6.1 to .net core 2.0.
+  * This also involves changing the way databases are loaded to a manual method which is .net core compatible.
+  * This breaks secure auth. That system will need to be reworked by someone more experienced to function properly.
+
+### 2017-12-03
+[Mag-nus]
+* Many projects converted to .net standard 2.0 or .net core 2.0
+* MySqlResult object removed from ACE.Database
+* ACE.Diagnostics removed from ACE. ('diag' command is disabled until we fine a better solution)
+* ACE.CmdLineLauncher changed over to ACE.ACClientLauncher. Build is also disabled by default in Configuration Manager.
+
+### 2017-12-02
+[Ripley]
+* Updated README links relating to Protocol documentation.
+* Fixed read issue with AnimationFrame in DatLoader. (Issue reported from Discord & confirmed by OptimShi)
+* Rebased SQL scripts.
+
+[Mag-nus]
+* Changes to eventually support .net core 2.0
+  * Changed target .net framework to 4.6.1
+  * Changed build environment to Visual Studio 2017.
+
+### 2017-11-26
+[Ripley]
+* Deleted VendorItems class.
+* Replaced VendorItems class with more generic AceObjectInventory class.. This is entirely based on CreationProfile found in protocol doc so probably could stand to be renamed, same with database table.
+* Made changes to Vendor to use AceObjectInventory and added a bit more functionality with respect to alternate currency.
+* Added more to DestinationType enum.
+* Added some properties to AO/WO.
+* Added WieldList object spawning to the CreateWorldObjects function of the WorldObjectFactory. This is not the final, correct way to do this but does visually look right.
+* WorldObjects are not really world aware so they have much work to do to be able to really wield and use objects, as well as report them properly to the landblock manager.
+
+### 2017-11-20
+[OptimShi]
+* Changed EquipTest debug command to utilize the index of a clothing table item and added an optional shade parameter
+
+### 2017-11-18
+[Ripley]
+* Added some foundational elements to support Chess minigame.
+* Client handles it cleanly now.
+* Find a chessboard in the world and try it out. Enjoy your table flipping.
+
+
+### 2017-11-10
+[Verbal]
+* updated fellowship creation to read the xp sharing flag
+
+### 2017-11-09
+[fantoms]
+* Added command and API endpoint for retreiving the database content from Github.
+* You can now redeploy database content from local disk.
+* Updated logging for redeployment.
+* Added `ContentServer` example config setting.
+
+### 2017-11-05
+[fantoms]
+* Added Database Redeployment feature to allow for updating or resetting a database from the latest github content.
+* Added `redeploy-world` command from the console to issue world redeployment.
+* Added `redeploy` console command to allow for resetting one or more databases, using the redeployment functionality. This command requires a database selectiona dnd the "force" string as a parameter, for added security.
+* Implemented API functionality for World redeployment and database Redeployment.
+* Added configuration section for Remote Content downloads from Github, `ContentServer`.
+* Added database.cs functions to allow for database creation, removal, connectionString changes, and database script loading events.
+* Added WorldDatabase function to check for user modified flag.
+* Added a workaround that prevents a crash when a bad token is passed in to the API.
+
+### 2017-11-03
+[ddevec]
+* Change core structure eliminating multi-threading between threads.  
+* Removed ChainOnObject() from landblock, make GetObject() public.
+* Simplified Action code to reflect for new threading model.
+
+[Ripley]
+* Fix AppVeyor issues.
+
+### 2017-11-02
+[Ripley]
+* Fix Landblock loading of weenie instance position data.
+
+### 2017-11-01
+[Ripley]
+* Updated EmoteCategory, EmoteType, and SpellType enums.
+* Add CombatStyle enum.
+* Rebased SQL scripts.
+* Changed all PropertyInt properties from uint to int.
+** NOTE: ACE-World database version required to be 0.2.7 or higher from this point forward. **
+* Todo/Fixme: Combat Stances don't work properly due to GetInventoryItem issue.
+* Cleaned up StyleCop issues.
+* Updated README with ACE-World requirement.
+
+### 2017-10-30
+[Mogwai]
+* implemented updating of weenies in ace-world necessary for crowd-sourced content creation
+* added database unit tests to AppVeyor build
+
+### 2017-10-27
+[OptimShi]
+* Updated DatLoader.FileTypes.SetupModel to more closely represent what is in the client. Also added additional structures to this to fully read the file.
+
+[Mogwai]
+* Loads of new JSON property renaming
+* New API definitions stubbed, some implemented
+
+### 2017-10-25
+[fantoms]
+* Changed an exception in AuthApi, to prevent the server from crashing on a bad account.
+* API Updates for roles in token, you should now be closer to using the correct `[AceAuthorize(AccessLevel)]` reflection with Api functions.
+ - Api will take the first subscription's accesslevel, when checking roles; this should probably be set to take the highest level. AccessLevel of Player (0) is used when a subscription is missing.
+
+### 2017-10-24
+[OptimShi]
+* Fixed bug with Equipment Mask enum that was causing Greaves/Lower Leg Armor not to appear on character
+
+[Mogwai]
+* API Host Updates for consistency and messaging.
+* Defined and implemented Content API.
+* Started the Weenie API definition.
+* removed the old/unused web project.
+
+[Ripley]
+* @Slushnas found WebApp.Start error in ACE.AuthApi.Host: Changed ACE.Api.Startup to ACE.AuthApi.Startup to fix domain error.
+* AuthServer Changes:
+  - AuthServer needs a publicly accessible address to point connecting clients if you're trying to use the server outside of a localhost/internal lan only environment.
+  - The current defaults basically point everything to "http://+:8001" which fails to resolve. So the following changes have been made..
+  - Changed AuthServer.Url to AuthServer.ListenUrl
+  - Added AuthServer.PublicUrl
+  - Typically, you'll leave the AuthServer.ListenUrl to the default, but you'll want to change AuthServer.PublicUrl to either of the following: 
+    * The externally accessible address of the AuthServer so that clients from the internet can authenticate.
+    or
+    * localhost or the internal lan address so only those inside the local network/local machine can authenticate.
+
+### 2017-10-23
+[Jyrus]
+* Fix a typeo in ACE.AuthApi.Host, as it was attempting to start the API host in place of the AuthAPI host
+
+### 2017-10-22
+[fantoms]
+* Changed build output path for Api.Host and AuthApi.Host projects, in an attempt to share the server config for debug and build.
+* Added simple service configuration function to Api.Common, to load the initial config for Api host apps.
+* Updated README.md to include additional instructions for Api host support.
+* Added a few null checks to prevent crashes in the AuthApi login function.
+* Added a config error check on the cmd line launcher, for ease of use.
+* Added config examples that are open to the world.
+
+### 2017-10-21
+[Jyrus]
+* Add the initial set of CoinValue in Container.cs to the value of contained Coins
+* Modified item move, drop, and pickup methods to account for pyreal changes using StackOverflow's UpdateCurrencyClientCalculations();
+
+### 2017-10-20
+[Mogwai]
+* Authentication overhaul is done.  Please note there are significant changes to the Readme file.
+
+### 2017-10-19
+[Jyrus]
+* Created WO.StackUnitValue and WO.StackUnitBurden to be initialized by Weenie.{Value,EncumbranceVal}, with builtin null to zero initialization
+* Moved WorldObject value and encumbrance calculations down to the WO class based upon WO.StackUnitValue and WO.StackUnitBurden vs WO.StackSize
+
+[Og II]
+* Added processing for contract management add / abandon.
+* Removed update script I added back on 10/14 to fix the burden of the weenie for the MMD note.   This is no lonager needed - use Dereth v0.2.4 or greater the issue has been 
+* resolved in the data and the script is no longer needed.
+* Minor code cleanup and improved some method documentation.
+* Added new table to store persisted tracked contracts (quests)
+* Implemented two new game events / SendClientContractTrackerTable and SendClientContractTracker
+* Implemented abandon quest - Game action - Social_AbandonContract
+* Documeted methods and updated trello.
+* To test @ci 44163 -create a contract.   Use the contract and you are now tracking that quest.   You can create any contract using ci or buy one from a vendor if they are In
+* did not check vendors.   You can abandon the contract.   All management and the cooldown delay of 2 seconds is respected.
+
+### 2017-10-18
+[StackOverflow]
+* Vendors - Fixed bug with sell of item from wielded locations
+* Inventory - Major Refractor of Code. (many conditional bugs fixed)
+* Fixed server crash bug on dropping wielded items (items now drop to ground np)
+* Fixed bug with dropping clothing / armor to landblock
+
+### 2017-10-17
+[Jyrus]
+* Reconfigured and renamed functions to account for Potions being included in class Food
+* Wired up applying the chosen starting town to the Training Academy path used
+
+[StackOverflow]
+* Vendors are no longer free!
+* Pyreals as currency has been added.
+* @setcoin added for debugging of sync of coinValue gets away during dev.
+
+### 2017-10-16
+[Jyrus]
+* Implemented Food class for consuming food items
+* Stub created for handling Buffing food but implementation is not complete, as spellcasting has not been completed, yet
+* Implemented a method for removing an item from inventory that also handles item stacks.
+* Included a fix for stack splitting to create proper WorldObject, instead of defaulting everything to GenericObjects
+[StackOverflow]
+* Made all vendors free as long as you have some money in your pack
+* Prepping for real pyreal transactions.
+* Fixed Packs, you can now buy packs and use them without the need to relog
+
+### 2017-10-14
+[Og II]
+* Added processing for merge items.
+* Added script to update the burden, value and stack size of the weenie for MMD notes I used in testing.   20630 - value 250,000 burden 5 and stacksize 1
+
+### 2017-10-13
+[Og II]
+* Added processing for item inscription. Implemented Set Inscription and Inscription Response messages. 
+* Inscriptions persist to the database and can be removed.  
+* Implemented first pass of same inscriber check. Sends error message and does not update the item. This may need to be revisited, I * * thought it blocked you from changing it - not sure if that was a weenie error sent to client - I did not see a fail inscribe in live * pcaps. It does check the inscribable flag and will prevent any pre-inscribed items (quest items with inscriptions from being altered. * Thanks @LtRipley36706 for pointing that out.
+
+### 2017-10-12
+[Ripley]
+* Added Burden tracking to Players and Containers.
+* Added CoinValue tracking via objects of WeenieType.Coin to Players and Containers.
+* Added Value tracking to Containers.
+* Commented out areas related to above changes that were not implemented correctly.
+* TODO: Update Value/Burden and track changes as StackSize adjustments occur.
+* TODO FIXME: Vendors code need to be adjusted to work with pyreal objects, not CoinValue direct.
+
+### 2017-10-11
+[StackOverflow]
+* Added support for unique Vendor Items.
+* Added a new Debug Cmd, @setcoin value for testing purposes.
+* Major Vendor Code refractor, vendor now only load items for sale and not items they should be wielding.
+
+### 2017-10-06
+[Jyrus]
+* Moved WeenieType keys into their own class and implemented unlocking doors via keys
+
+[Immortalbob]
+* Added equipmentset.cs to house the equipment set enums for future use.
+
+### 2017-10-05
+[Immortalbob]
+* Identified unknown enums 381 382 383 384 387 388 389 and updated acecharacter.cs and propertyint.cs.
+
+[Mogwai]
+* Modified vendor stuff to use buy and sell rates from DoubleProperties
+
+### 2017-10-04
+[Jyrus]
+* Moved handling of the Portals into the HandleOnCollide method and implemented MoveTo for OnUse for Portals.  Currently, OnUse also queues up portaling
+	via a direct call to Portal.HandleOnCollide, which can be removed when collision is implemented.
+  
+[StackOverflow]
+* Added Vendors (Go buy stuff!) - work in progress
+* Added Debug command to give coins.
+* @addcoin 100000
+* known issue with pyreals in inventory.. drop them on the ground if you want the math to be correct for now.
+
+### 2017-10-03
+[OptimShi]
+* Added method to get animation timings out of MotionTable and updated several instances where we were faking it previously.
+
+[Og II]
+* Added update script to modify defaultCombatStance ace_object_properties_int to match change with @OptimShi changes of 10/02
+* Rolled back [ServerOnly] attribute on enums.   I left the mechanism in place and tagged all over 9000 as such.   Our method for determining
+* this is not correct.   We can add these back when we fully understand which are truly not needed by the client.
+
+### 2017-10-02
+[OptimShi]
+* Changed MotionCommand and MotionState enums to full uint instead of short and adjusted the movement serializing functions to work with these changes.
+* Fixed bug when leaving CombatMode with no ammunition equipped (e.g. melee or magic mode)
+* Added "acecommands" tip to console start up
+* Corrected an issue with the palette of head gear chosen at character creation.
+
+[Og II]
+* Initial work on content interactions.
+* Cleaned up the using statements on several files.
+* Aligned the enums to = sign
+* Fixed bug in universal motion using the TurnToObject
+* Added enum attributes for all of our property enums per Mogwai using the data from OptimShi found here
+* http://ac.yotesfan.com/ace_object/not_used_enums.php
+* WIP need to filer out sending of aceObject properties using this information.   I am stuck on the lambda expression.   
+* see line 74 in GameEventPlayerDescription.   Any help appreciated.
+* NOTE: the big gotcha with this is if we have any of the [ServerOnly] attributes set incorrectly, that data will not get sent to the client
+* and if you don't remember that we are filtering by that attribute you will be going what the hell is wrong.   Just an FYI
+
+[Immortal Bob]
+* Identified and changed enum Unknown_386 to Overpower.
+
+[Ripley]
+* Added WeenieType.Coin handler.
+* Wired up CoinValue and attached proper tracking to WeenieType.Container handler.
+  - Proper stack splitting or pickup of items that allow stacking still not handled by server.
+  - Correct mathing requires base WeenieType.Coin weenies in database be set correctly. Value/StackSize need to be set to single value initally.
+  - ACE-World will need to be updated to fix base values.
+
+### 2017-10-01
+[Og II]
+* Initial work on content interactions.
+* Cleaned up the using statements on several files.
+* Aligned the enums to = sign
+* Fixed bug in universal motion using the TurnToObject
+
+### 2017-09-30
+[Ripley]
+* Merged updates into WorldBase.
+* Fixed saving books to the Shard database.
+* Characters now equip items on world entry. (This will reveal bugs in clothing layer priority and model change issues)
 
 ### 2017-09-25
 [Og II]
@@ -15,7 +321,6 @@
 ### 2017-09-20
 [Ripley]
 * Added a minimum UseRadius to Doors. This prevents the radius being so small as to require you to be inside the door to open/close it.
-
 
 ### 2017-09-18
 [Mogwai]
